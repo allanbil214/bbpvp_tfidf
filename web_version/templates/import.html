@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+
+{% block title %}Import Data - BBPVP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-file-import text-success me-3"></i>
+        Import Data
+    </h1>
+    <p class="page-subtitle">Load training programs and job position datasets</p>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-cloud-download-alt me-2"></i>
+                Data Source
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-database me-2"></i>
+                        Select Data Source
+                    </label>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="dataSource" id="sourceGithub" value="github" checked>
+                        <label class="form-check-label" for="sourceGithub">
+                            <i class="fab fa-github me-2"></i>
+                            <strong>Load from GitHub</strong>
+                            <br>
+                            <small class="text-muted">Load data directly from online repository</small>
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="dataSource" id="sourceLocal" value="local">
+                        <label class="form-check-label" for="sourceLocal">
+                            <i class="fas fa-upload me-2"></i>
+                            <strong>Upload Local Files</strong>
+                            <br>
+                            <small class="text-muted">Upload Excel files from your computer</small>
+                        </label>
+                    </div>
+                </div>
+                
+                <div id="githubOptions" class="mb-4">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>GitHub Mode:</strong> Data will be loaded directly from the repository. No file selection needed.
+                    </div>
+                </div>
+                
+                <div id="localOptions" class="mb-4" style="display: none;">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Training Programs File</label>
+                        <input type="file" class="form-control" id="trainingFile" accept=".xlsx,.xls">
+                        <small class="text-muted">Excel file with training programs</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Job Positions File</label>
+                        <input type="file" class="form-control" id="jobFile" accept=".xlsx,.xls">
+                        <small class="text-muted">Excel file with job positions</small>
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-lg" id="btnLoadBoth">
+                        <i class="fas fa-download me-2"></i>
+                        Load BOTH Datasets
+                    </button>
+                    
+                    <hr>
+                    
+                    <p class="text-center text-muted mb-2">
+                        <small>Or load individually:</small>
+                    </p>
+                    
+                    <button class="btn btn-outline-primary" id="btnLoadTraining">
+                        <i class="fas fa-graduation-cap me-2"></i>
+                        Load Training Data Only
+                    </button>
+                    
+                    <button class="btn btn-outline-primary" id="btnLoadJobs">
+                        <i class="fas fa-briefcase me-2"></i>
+                        Load Job Data Only
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="fas fa-question-circle me-2"></i>
+                Data Format Requirements
+            </div>
+            <div class="card-body">
+                <h6 class="mb-3">Training Programs File:</h6>
+                <ul class="small mb-3">
+                    <li>Sheet name: "Versi Ringkas Untuk Tesis"</li>
+                    <li>Required columns:
+                        <ul>
+                            <li>PROGRAM PELATIHAN</li>
+                            <li>Tujuan/Kompetensi</li>
+                            <li>Deskripsi Program</li>
+                        </ul>
+                    </li>
+                </ul>
+                
+                <h6 class="mb-3">Job Positions File:</h6>
+                <ul class="small mb-0">
+                    <li>Sheet name: "petakan ke KBJI"</li>
+                    <li>Required columns:
+                        <ul>
+                            <li>Nama Jabatan</li>
+                            <li>Deskripsi KBJI</li>
+                            <li>Kompetensi</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>
+                    <i class="fas fa-list me-2"></i>
+                    Import Status & Data Preview
+                </span>
+                <button class="btn btn-sm btn-outline-light" id="btnClearLogs">
+                    <i class="fas fa-eraser me-1"></i>
+                    Clear
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="importStatus">
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-file-import fa-3x mb-3 opacity-50"></i>
+                        <p>Select a data source and click "Load" to begin importing data</p>
+                        <div class="mt-4">
+                            <div class="row text-start">
+                                <div class="col-md-6">
+                                    <div class="alert alert-light">
+                                        <h6><i class="fas fa-info-circle text-info me-2"></i>Quick Start:</h6>
+                                        <ol class="small mb-0">
+                                            <li>Keep "GitHub" selected</li>
+                                            <li>Click "Load BOTH Datasets"</li>
+                                            <li>Wait for loading to complete</li>
+                                            <li>Proceed to Preprocessing</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="alert alert-light">
+                                        <h6><i class="fas fa-clock text-warning me-2"></i>Estimated Time:</h6>
+                                        <ul class="small mb-0">
+                                            <li>GitHub: ~5-10 seconds</li>
+                                            <li>Local files: ~2-5 seconds</li>
+                                            <li>Depends on file size and connection</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row g-4 mt-1">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-graduation-cap fa-3x text-primary mb-3"></i>
+                        <h3 class="mb-1" id="trainingCount">0</h3>
+                        <p class="text-muted mb-0">Training Programs Loaded</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-briefcase fa-3x text-success mb-3"></i>
+                        <h3 class="mb-1" id="jobCount">0</h3>
+                        <p class="text-muted mb-0">Job Positions Loaded</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Toggle data source options
+    $('input[name="dataSource"]').change(function() {
+        if ($(this).val() === 'github') {
+            $('#githubOptions').show();
+            $('#localOptions').hide();
+        } else {
+            $('#githubOptions').hide();
+            $('#localOptions').show();
+        }
+    });
+    
+    // Load both datasets
+    $('#btnLoadBoth').click(function() {
+        loadData('both');
+    });
+    
+    // Load training only
+    $('#btnLoadTraining').click(function() {
+        loadData('training');
+    });
+    
+    // Load jobs only
+    $('#btnLoadJobs').click(function() {
+        loadData('jobs');
+    });
+    
+    // Clear logs
+    $('#btnClearLogs').click(function() {
+        $('#importStatus').html(`
+            <div class="text-center text-muted py-5">
+                <i class="fas fa-file-import fa-3x mb-3 opacity-50"></i>
+                <p>Logs cleared. Ready to import data.</p>
+            </div>
+        `);
+    });
+});
+
+function addImportLog(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const icons = {
+        'info': 'fa-info-circle text-info',
+        'success': 'fa-check-circle text-success',
+        'error': 'fa-times-circle text-danger',
+        'warning': 'fa-exclamation-triangle text-warning'
+    };
+    
+    const log = `
+        <div class="mb-2 p-2 border-start border-3 border-${type === 'error' ? 'danger' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info'}" style="background: #f8fafc;">
+            <small class="text-muted">[${timestamp}]</small>
+            <i class="fas ${icons[type]} me-2"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    if ($('#importStatus').find('.text-center').length > 0) {
+        $('#importStatus').html('');
+    }
+    
+    $('#importStatus').append(log);
+    $('#importStatus').scrollTop($('#importStatus')[0].scrollHeight);
+}
+
+function loadData(type) {
+    const source = $('input[name="dataSource"]:checked').val();
+    const button = type === 'both' ? '#btnLoadBoth' : type === 'training' ? '#btnLoadTraining' : '#btnLoadJobs';
+    
+    $(button).prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Loading...');
+    
+    $('#importStatus').html('<div class="text-center py-4">' + showLoading('Loading data from ' + source + '...') + '</div>');
+    
+    addImportLog('=' .repeat(80), 'info');
+    addImportLog(`Starting data import: ${type.toUpperCase()}`, 'info');
+    addImportLog('=' .repeat(80), 'info');
+    addImportLog(`Source: ${source}`, 'info');
+    
+    if (source === 'local') {
+        addImportLog('Local file upload not yet implemented', 'warning');
+        $(button).prop('disabled', false).html($(button).data('original-text'));
+        return;
+    }
+    
+    $.ajax({
+        url: '/api/load-data',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            source: source,
+            type: type
+        }),
+        success: function(response) {
+            if (response.success) {
+                addImportLog('', 'info');
+                addImportLog('✓ Data loaded successfully!', 'success');
+                addImportLog('=' .repeat(80), 'success');
+                
+                if (response.training_count) {
+                    addImportLog(`📚 Training Programs: ${response.training_count} records`, 'success');
+                    $('#trainingCount').text(response.training_count);
+                    animateValue('trainingCount', 0, response.training_count, 1000);
+                }
+                
+                if (response.job_count) {
+                    addImportLog(`💼 Job Positions: ${response.job_count} records`, 'success');
+                    $('#jobCount').text(response.job_count);
+                    animateValue('jobCount', 0, response.job_count, 1000);
+                }
+                
+                addImportLog('=' .repeat(80), 'success');
+                addImportLog('', 'info');
+                
+                const totalRecords = (response.training_count || 0) + (response.job_count || 0);
+                addImportLog(`📊 Total records loaded: ${totalRecords}`, 'info');
+                addImportLog('', 'info');
+                
+                addImportLog('✨ Ready for next step!', 'success');
+                addImportLog('👉 Go to "Preprocessing" tab to process the data', 'info');
+                
+                // Show success alert
+                const successAlert = `
+                    <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Success!</strong> Data loaded successfully. You can now proceed to preprocessing.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+                $('#importStatus').append(successAlert);
+            } else {
+                addImportLog('', 'error');
+                addImportLog('✗ Failed to load data', 'error');
+                addImportLog(`Error: ${response.message}`, 'error');
+                
+                const errorAlert = `
+                    <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                        <i class="fas fa-times-circle me-2"></i>
+                        <strong>Error!</strong> ${response.message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+                $('#importStatus').append(errorAlert);
+            }
+        },
+        error: function(xhr) {
+            addImportLog('✗ Unexpected error occurred', 'error');
+            addImportLog('Please check your connection and try again', 'error');
+            
+            const errorAlert = `
+                <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>Error!</strong> An unexpected error occurred. Please try again.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            $('#importStatus').append(errorAlert);
+        },
+        complete: function() {
+            const originalText = type === 'both' ? 
+                '<i class="fas fa-download me-2"></i>Load BOTH Datasets' : 
+                type === 'training' ? 
+                '<i class="fas fa-graduation-cap me-2"></i>Load Training Data Only' : 
+                '<i class="fas fa-briefcase me-2"></i>Load Job Data Only';
+            
+            $(button).prop('disabled', false).html(originalText);
+        }
+    });
+}
+
+function animateValue(id, start, end, duration) {
+    const obj = document.getElementById(id);
+    const range = end - start;
+    const increment = end > start ? 1 : -1;
+    const stepTime = Math.abs(Math.floor(duration / range));
+    let current = start;
+    
+    const timer = setInterval(function() {
+        current += increment;
+        obj.textContent = current;
+        if (current === end) {
+            clearInterval(timer);
+        }
+    }, stepTime);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,499 @@
+{% extends "base.html" %}
+
+{% block title %}Preprocessing - BBPVP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-cogs text-info me-3"></i>
+        Text Preprocessing
+    </h1>
+    <p class="page-subtitle">Clean and prepare text data for analysis</p>
+</div>
+
+{% if not has_training or not has_jobs %}
+<div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>Warning:</strong> Data not loaded yet. 
+    Please go to <a href="/import" class="alert-link">Import page</a> and load data first.
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-sliders-h me-2"></i>
+                Preprocessing Options
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-database me-2"></i>
+                        Select Dataset
+                    </label>
+                    <select class="form-select" id="datasetSelect" {% if not has_training %}disabled{% endif %}>
+                        <option value="training">Training Programs ({{ training_count }} records)</option>
+                        <option value="job">Job Positions ({{ job_count }} records)</option>
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-hashtag me-2"></i>
+                        Select Row for Preview
+                    </label>
+                    <input type="number" class="form-control" id="rowIndex" value="0" min="0" {% if not has_training %}disabled{% endif %}>
+                    <small class="text-muted">Enter row number to preview preprocessing steps</small>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold mb-3">
+                        <i class="fas fa-list-ol me-2"></i>
+                        Preprocessing Steps
+                    </label>
+                    
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary" onclick="showStep(0)" {% if not has_training %}disabled{% endif %}>
+                            <i class="fas fa-file-alt me-2"></i>
+                            Original Text
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="showStep(1)" {% if not has_training %}disabled{% endif %}>
+                            <i class="fas fa-filter me-2"></i>
+                            1. Normalization
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="showStep(2)" {% if not has_training %}disabled{% endif %}>
+                            <i class="fas fa-ban me-2"></i>
+                            2. Stopword Removal
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="showStep(3)" {% if not has_training %}disabled{% endif %}>
+                            <i class="fas fa-cut me-2"></i>
+                            3. Tokenization
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="showStep(4)" {% if not has_training %}disabled{% endif %}>
+                            <i class="fas fa-leaf me-2"></i>
+                            4. Stemming
+                        </button>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-lg" id="btnProcessAll" {% if not has_training %}disabled{% endif %}>
+                        <i class="fas fa-rocket me-2"></i>
+                        Process All Data
+                    </button>
+                    <small class="text-muted text-center">
+                        This will process all {{ training_count + job_count }} records
+                    </small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-2"></i>
+                Preprocessing Pipeline
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="badge bg-primary me-2" style="width: 30px;">1</div>
+                        <div>
+                            <strong>Normalization</strong>
+                            <br>
+                            <small class="text-muted">Lowercase, remove punctuation & numbers</small>
+                        </div>
+                    </div>
+                    <div class="progress mb-3" style="height: 5px;">
+                        <div class="progress-bar" style="width: 100%;"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="badge bg-primary me-2" style="width: 30px;">2</div>
+                        <div>
+                            <strong>Stopword Removal</strong>
+                            <br>
+                            <small class="text-muted">Remove common Indonesian words</small>
+                        </div>
+                    </div>
+                    <div class="progress mb-3" style="height: 5px;">
+                        <div class="progress-bar" style="width: 100%;"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="badge bg-primary me-2" style="width: 30px;">3</div>
+                        <div>
+                            <strong>Tokenization</strong>
+                            <br>
+                            <small class="text-muted">Split text into words</small>
+                        </div>
+                    </div>
+                    <div class="progress mb-3" style="height: 5px;">
+                        <div class="progress-bar" style="width: 100%;"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-0">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="badge bg-primary me-2" style="width: 30px;">4</div>
+                        <div>
+                            <strong>Stemming</strong>
+                            <br>
+                            <small class="text-muted">Convert to root words (Sastrawi)</small>
+                        </div>
+                    </div>
+                    <div class="progress" style="height: 5px;">
+                        <div class="progress-bar" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>
+                    <i class="fas fa-desktop me-2"></i>
+                    Preprocessing Output
+                </span>
+                <button class="btn btn-sm btn-outline-light" id="btnClearOutput">
+                    <i class="fas fa-eraser me-1"></i>
+                    Clear
+                </button>
+            </div>
+            <div class="card-body" style="min-height: 500px;">
+                <div id="preprocessOutput">
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-cogs fa-3x mb-3 opacity-50"></i>
+                        <p>Select a preprocessing step to view the output</p>
+                        <div class="mt-4">
+                            <div class="alert alert-light text-start">
+                                <h6><i class="fas fa-lightbulb text-warning me-2"></i>Quick Guide:</h6>
+                                <ol class="small mb-0">
+                                    <li>Choose a dataset (Training or Job)</li>
+                                    <li>Enter a row number (0 to {{ training_count - 1 }})</li>
+                                    <li>Click on any preprocessing step to preview</li>
+                                    <li>Or click "Process All Data" to process everything</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4" id="progressCard" style="display: none;">
+            <div class="card-header">
+                <i class="fas fa-tasks me-2"></i>
+                Processing Progress
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span id="progressLabel">Initializing...</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" id="progressBar" style="width: 0%;">
+                            <span id="progressText">Starting...</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="progressDetails" class="mt-3 small text-muted"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Process all data
+    $('#btnProcessAll').click(function() {
+        processAllData();
+    });
+    
+    // Clear output
+    $('#btnClearOutput').click(function() {
+        $('#preprocessOutput').html(`
+            <div class="text-center text-muted py-5">
+                <i class="fas fa-cogs fa-3x mb-3 opacity-50"></i>
+                <p>Output cleared. Select a preprocessing step to continue.</p>
+            </div>
+        `);
+    });
+    
+    // Update row index max based on dataset
+    $('#datasetSelect').change(function() {
+        const dataset = $(this).val();
+        const maxRows = dataset === 'training' ? {{ training_count }} - 1 : {{ job_count }} - 1;
+        $('#rowIndex').attr('max', maxRows);
+    });
+});
+
+function showStep(step) {
+    const dataset = $('#datasetSelect').val();
+    const rowIdx = parseInt($('#rowIndex').val());
+    
+    $('#preprocessOutput').html(showLoading('Processing step...'));
+    
+    $.ajax({
+        url: '/api/preprocess-step',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            dataset: dataset,
+            row_idx: rowIdx,
+            step: step
+        }),
+        success: function(response) {
+            if (response.success) {
+                displayStepOutput(step, response);
+            } else {
+                $('#preprocessOutput').html(showAlert('danger', response.message));
+            }
+        },
+        error: function() {
+            $('#preprocessOutput').html(showAlert('danger', 'Failed to process step'));
+        }
+    });
+}
+
+function displayStepOutput(step, response) {
+    const stepNames = [
+        'Original Text',
+        'Step 1: Normalization',
+        'Step 2: Stopword Removal',
+        'Step 3: Tokenization',
+        'Step 4: Stemming'
+    ];
+    
+    let html = `
+        <div class="mb-4">
+            <div class="d-flex align-items-center mb-3">
+                <h5 class="mb-0">
+                    <span class="badge bg-primary me-2">${step}</span>
+                    ${stepNames[step]}
+                </h5>
+            </div>
+            <div class="alert alert-light">
+                <strong><i class="fas fa-file-alt me-2"></i>Record:</strong> ${response.record_name}
+            </div>
+        </div>
+    `;
+    
+    if (step < 3) {
+        // Text output
+        html += `
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h6 class="card-title">Output:</h6>
+                    <pre class="mb-0" style="white-space: pre-wrap; word-wrap: break-word;">${response.output}</pre>
+                </div>
+            </div>
+        `;
+    } else if (step === 3) {
+        // Tokenization output
+        html += `
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h6 class="card-title">Tokens:</h6>
+                    <div class="mb-3">
+        `;
+        
+        response.output.forEach((token, idx) => {
+            html += `<span class="badge bg-info me-1 mb-1">${token}</span>`;
+        });
+        
+        html += `
+                    </div>
+                    <div class="alert alert-info mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Total tokens:</strong> ${response.token_count}
+                    </div>
+                </div>
+            </div>
+        `;
+    } else if (step === 4) {
+        // Stemming output
+        html += `
+            <div class="card bg-light mb-3">
+                <div class="card-body">
+                    <h6 class="card-title">Stemmed Tokens:</h6>
+                    <div class="mb-3">
+        `;
+        
+        response.output.forEach((token, idx) => {
+            html += `<span class="badge bg-success me-1 mb-1">${token}</span>`;
+        });
+        
+        html += `
+                    </div>
+                    <div class="alert alert-success mb-0">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Total tokens after stemming:</strong> ${response.token_count}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Comparison table
+        if (response.original_tokens) {
+            html += `
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-exchange-alt me-2"></i>
+                        Before & After Stemming (First 20 tokens)
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th width="50">#</th>
+                                        <th>Before Stemming</th>
+                                        <th>After Stemming</th>
+                                        <th width="100">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+            `;
+            
+            const maxShow = Math.min(20, response.original_tokens.length);
+            for (let i = 0; i < maxShow; i++) {
+                const before = response.original_tokens[i];
+                const after = response.output[i];
+                const changed = before !== after;
+                
+                html += `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td><code>${before}</code></td>
+                        <td><code>${after}</code></td>
+                        <td>
+                            ${changed ? 
+                                '<span class="badge bg-warning text-dark">Changed</span>' : 
+                                '<span class="badge bg-secondary">Same</span>'}
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+    
+    $('#preprocessOutput').html(html);
+}
+
+function processAllData() {
+    $('#btnProcessAll').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Processing...');
+    $('#progressCard').show();
+    
+    updateProgress(0, 'Starting preprocessing...', 'Initializing...');
+    
+    $.ajax({
+        url: '/api/process-all',
+        method: 'POST',
+        contentType: 'application/json',
+        success: function(response) {
+            if (response.success) {
+                updateProgress(100, 'Processing complete!', '✓ All data processed successfully');
+                
+                $('#preprocessOutput').html(`
+                    <div class="text-center py-5">
+                        <i class="fas fa-check-circle fa-4x text-success mb-4"></i>
+                        <h4 class="text-success mb-3">Processing Complete!</h4>
+                        <p class="text-muted mb-4">All data has been preprocessed successfully.</p>
+                        <div class="alert alert-success text-start">
+                            <h6><i class="fas fa-clipboard-check me-2"></i>What was processed:</h6>
+                            <ul class="mb-0">
+                                <li>Normalization: Converted to lowercase, removed punctuation and numbers</li>
+                                <li>Stopword Removal: Filtered out common Indonesian words</li>
+                                <li>Tokenization: Split text into individual words</li>
+                                <li>Stemming: Converted words to their root forms using Sastrawi</li>
+                            </ul>
+                        </div>
+                        <div class="mt-4">
+                            <a href="/tfidf" class="btn btn-primary btn-lg">
+                                <i class="fas fa-arrow-right me-2"></i>
+                                Proceed to TF-IDF Calculation
+                            </a>
+                        </div>
+                    </div>
+                `);
+                
+                setTimeout(() => {
+                    $('#progressCard').slideUp();
+                }, 3000);
+            } else {
+                updateProgress(0, 'Error occurred', response.message);
+                $('#preprocessOutput').html(showAlert('danger', response.message));
+            }
+        },
+        error: function() {
+            updateProgress(0, 'Error occurred', 'Failed to process data');
+            $('#preprocessOutput').html(showAlert('danger', 'Failed to process data'));
+        },
+        complete: function() {
+            $('#btnProcessAll').prop('disabled', false).html('<i class="fas fa-rocket me-2"></i>Process All Data');
+        }
+    });
+    
+    // Simulate progress (since backend processing is fast)
+    simulateProgress();
+}
+
+function simulateProgress() {
+    const steps = [
+        {percent: 25, label: 'Normalizing text...', detail: 'Converting to lowercase, removing punctuation'},
+        {percent: 50, label: 'Removing stopwords...', detail: 'Filtering out common Indonesian words'},
+        {percent: 75, label: 'Tokenizing...', detail: 'Splitting text into words'},
+        {percent: 95, label: 'Stemming...', detail: 'Converting to root words using Sastrawi'}
+    ];
+    
+    let currentStep = 0;
+    const interval = setInterval(() => {
+        if (currentStep < steps.length) {
+            const step = steps[currentStep];
+            updateProgress(step.percent, step.label, step.detail);
+            currentStep++;
+        } else {
+            clearInterval(interval);
+        }
+    }, 800);
+}
+
+function updateProgress(percent, label, detail) {
+    $('#progressBar').css('width', percent + '%');
+    $('#progressPercent').text(percent + '%');
+    $('#progressLabel').text(label);
+    $('#progressText').text(percent + '%');
+    
+    if (detail) {
+        const timestamp = new Date().toLocaleTimeString();
+        $('#progressDetails').append(`
+            <div>
+                <span class="text-muted">[${timestamp}]</span>
+                <i class="fas fa-arrow-right text-primary me-2"></i>
+                ${detail}
+            </div>
+        `);
+    }
+}
+</script>
+{% endblock %}

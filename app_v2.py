@@ -2,7 +2,7 @@
 BBPVP Job Matching System - GUI Application
 A complete GUI for text preprocessing and TF-IDF based job matching
 """
-# pip install pandas numpy scikit-learn matplotlib Sastrawi openpyxl
+# pip install pandas numpy scikit-learn matplotlib Sastrawi openpyxl mysql-connector-python
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
@@ -15,6 +15,10 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import io
 import threading
+import mysql.connector
+from mysql.connector import Error
+import json
+from datetime import datetime
 
 # Try to import Sastrawi, provide fallback if not available
 try:
@@ -31,12 +35,27 @@ class BBPVPMatchingGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("BBPVP Job to Training Program Matching System")
-        self.root.geometry("1200x800")
+        self.root.geometry("1400x900")
         
+        self.db_config = {
+            'host': 'localhost',
+            'port': 3307,
+            'database': 'bbpvp_thesis',
+            'user': 'root',
+            'password': '',
+            'charset': 'utf8mb4',
+            'use_unicode': True
+        }
+        
+        self.db_connection = None
+        self.current_experiment_id = None
+        self.connect_to_database()
+
         # Data storage
         self.df_pelatihan = None
         self.df_lowongan = None
         self.current_step = 0
+        self.total_saved_sample = 5
         
         # GitHub URLs
         self.github_training_url = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/2.%20data%20bersih%20Program%20Pelatihan%20Tahun.xlsx"
@@ -48,7 +67,8 @@ class BBPVPMatchingGUI:
             'dalam', 'adalah', 'ini', 'itu', 'atau', 'oleh', 'sebagai',
             'juga', 'akan', 'telah', 'dapat', 'ada', 'tidak', 'hal',
             'tersebut', 'serta', 'bagi', 'hanya', 'sangat', 'bila',
-            'saat', 'kini', 'yaitu', 'dll', 'dsb', 'dst', 'setelah', 'mengikuti', 'sesuai', 'pelatihan'
+            'saat', 'kini', 'yaitu', 'dll', 'dsb', 'dst', 'setelah', 
+            'mengikuti', 'sesuai', 'pelatihan'
         }
 
         self.custom_stem_rules = {
@@ -57,6 +77,11 @@ class BBPVPMatchingGUI:
         }
         
         self.tabs_config = {
+            "database": {
+                "title": "0. Database Config",
+                "visible": True,
+                "builder": self.create_database_tab
+            },
             "import": {
                 "title": "1. Import Data",
                 "visible": True,
@@ -98,32 +123,172 @@ class BBPVPMatchingGUI:
             self.notebook.add(frame, text=cfg["title"])
             cfg["builder"](frame)
         
-    def create_import_tab(self, parent):
-        # Main frame
+    def create_database_tab(self, parent):
+        """Create database configuration tab"""
+        # Main frame with left-right layout
         main_frame = ttk.Frame(parent, padding="10")
         main_frame.pack(fill='both', expand=True)
         
-        # Title
-        title = ttk.Label(main_frame, text="Data Import", font=('Arial', 16, 'bold'))
+        # Left panel - Configuration
+        left_frame = ttk.Frame(main_frame, width=500)
+        left_frame.pack(side='left', fill='y', padx=(0, 10))
+        left_frame.pack_propagate(False)
+        
+        title = ttk.Label(left_frame, text="Database Configuration", font=('Arial', 16, 'bold'))
+        title.pack(pady=10)
+        
+        # Connection settings frame
+        settings_frame = ttk.LabelFrame(left_frame, text="MySQL Connection Settings", padding="15")
+        settings_frame.pack(fill='x', pady=10)
+        
+        # Host
+        ttk.Label(settings_frame, text="Host:", font=('Arial', 10, 'bold')).grid(row=0, column=0, sticky='w', pady=8)
+        self.db_host_entry = ttk.Entry(settings_frame, width=30)
+        self.db_host_entry.grid(row=0, column=1, sticky='ew', pady=8, padx=(10, 0))
+        self.db_host_entry.insert(0, self.db_config['host'])
+        
+        # Port
+        ttk.Label(settings_frame, text="Port:", font=('Arial', 10, 'bold')).grid(row=1, column=0, sticky='w', pady=8)
+        self.db_port_entry = ttk.Entry(settings_frame, width=30)
+        self.db_port_entry.grid(row=1, column=1, sticky='ew', pady=8, padx=(10, 0))
+        self.db_port_entry.insert(0, str(self.db_config['port']))
+        
+        # Database name
+        ttk.Label(settings_frame, text="Database:", font=('Arial', 10, 'bold')).grid(row=2, column=0, sticky='w', pady=8)
+        self.db_name_entry = ttk.Entry(settings_frame, width=30)
+        self.db_name_entry.grid(row=2, column=1, sticky='ew', pady=8, padx=(10, 0))
+        self.db_name_entry.insert(0, self.db_config['database'])
+        
+        # Username
+        ttk.Label(settings_frame, text="Username:", font=('Arial', 10, 'bold')).grid(row=3, column=0, sticky='w', pady=8)
+        self.db_user_entry = ttk.Entry(settings_frame, width=30)
+        self.db_user_entry.grid(row=3, column=1, sticky='ew', pady=8, padx=(10, 0))
+        self.db_user_entry.insert(0, self.db_config['user'])
+        
+        # Password
+        ttk.Label(settings_frame, text="Password:", font=('Arial', 10, 'bold')).grid(row=4, column=0, sticky='w', pady=8)
+        self.db_password_entry = ttk.Entry(settings_frame, width=30, show='•')
+        self.db_password_entry.grid(row=4, column=1, sticky='ew', pady=8, padx=(10, 0))
+        self.db_password_entry.insert(0, self.db_config['password'])
+        
+        # Show/Hide password checkbox
+        self.show_password_var = tk.BooleanVar(value=False)
+        def toggle_password():
+            if self.show_password_var.get():
+                self.db_password_entry.config(show='')
+            else:
+                self.db_password_entry.config(show='•')
+        
+        ttk.Checkbutton(settings_frame, text="Show password", 
+                    variable=self.show_password_var,
+                    command=toggle_password).grid(row=5, column=1, sticky='w', pady=5, padx=(10, 0))
+        
+        settings_frame.columnconfigure(1, weight=1)
+        
+        # Buttons frame
+        button_frame = ttk.LabelFrame(left_frame, text="Actions", padding="15")
+        button_frame.pack(fill='x', pady=10)
+        
+        ttk.Button(button_frame, text="💾 Save Configuration", 
+                command=self.save_db_config,
+                style='Accent.TButton', width=35).pack(pady=5)
+        
+        ttk.Button(button_frame, text="🔌 Test Connection", 
+                command=self.test_db_connection,
+                width=35).pack(pady=5)
+        
+        ttk.Button(button_frame, text="🔄 Reconnect with New Settings", 
+                command=self.reconnect_database,
+                width=35).pack(pady=5)
+        
+        ttk.Separator(button_frame, orient='horizontal').pack(fill='x', pady=10)
+        
+        ttk.Button(button_frame, text="↺ Reset to Defaults", 
+                command=self.reset_db_config,
+                width=35).pack(pady=5)
+        
+        # Info frame
+        info_frame = ttk.LabelFrame(left_frame, text="💡 Information", padding="10")
+        info_frame.pack(fill='x', pady=10)
+        
+        info_text = tk.Text(info_frame, height=10, wrap=tk.WORD, font=('Arial', 9))
+        info_text.pack(fill='x')
+        info_text.insert(1.0, 
+            "Database Configuration Guide:\n\n"
+            "1. Enter your MySQL connection details\n"
+            "2. Click 'Test Connection' to verify\n"
+            "3. Click 'Save Configuration' to apply\n"
+            "4. Connection status appears on the right →\n\n"
+            "Default Settings:\n"
+            "• Host: localhost\n"
+            "• Port: 3307\n"
+            "• Database: bbpvp_thesis\n"
+            "• User: root\n"
+            "• Password: (empty)\n\n"
+            "Note: Make sure MySQL is running and\n"
+            "the database schema is created!"
+        )
+        info_text.config(state='disabled')
+        
+        # Right panel - Status and logs
+        right_frame = ttk.Frame(main_frame)
+        right_frame.pack(side='left', fill='both', expand=True)
+        
+        ttk.Label(right_frame, text="Connection Status & Logs", 
+                font=('Arial', 12, 'bold')).pack(pady=5)
+        
+        # Connection status display
+        status_frame = ttk.LabelFrame(right_frame, text="Current Status", padding="10")
+        status_frame.pack(fill='x', pady=5)
+        
+        self.db_status_label = ttk.Label(status_frame, text="⚫ Not Connected", 
+                                        font=('Arial', 11, 'bold'))
+        self.db_status_label.pack(pady=5)
+        
+        self.db_status_detail = tk.Text(status_frame, height=4, wrap=tk.WORD, 
+                                        font=('Arial', 9), state='disabled')
+        self.db_status_detail.pack(fill='x', pady=5)
+        
+        # Connection logs
+        logs_frame = ttk.LabelFrame(right_frame, text="Connection Logs", padding="5")
+        logs_frame.pack(fill='both', expand=True, pady=5)
+        
+        self.db_log_output = scrolledtext.ScrolledText(logs_frame, wrap=tk.WORD, 
+                                                    font=('Consolas', 9))
+        self.db_log_output.pack(fill='both', expand=True)
+        
+        # Initial connection check
+        self.update_db_status()
+
+    def create_import_tab(self, parent):
+        # Main frame with left-right layout
+        main_frame = ttk.Frame(parent, padding="10")
+        main_frame.pack(fill='both', expand=True)
+        
+        # Left panel - Controls
+        left_frame = ttk.Frame(main_frame, width=400)
+        left_frame.pack(side='left', fill='y', padx=(0, 10))
+        
+        title = ttk.Label(left_frame, text="Data Import", font=('Arial', 16, 'bold'))
         title.pack(pady=10)
         
         # Data source selection
-        source_frame = ttk.LabelFrame(main_frame, text="Select Data Source", padding="10")
+        source_frame = ttk.LabelFrame(left_frame, text="Select Data Source", padding="10")
         source_frame.pack(fill='x', pady=10)
         
         self.data_source_var = tk.StringVar(value="github")
         
         ttk.Radiobutton(source_frame, text="Load from GitHub", 
-                       variable=self.data_source_var, value="github").pack(anchor='w')
+                       variable=self.data_source_var, value="github").pack(anchor='w', pady=5)
         ttk.Radiobutton(source_frame, text="Upload from Local Files", 
-                       variable=self.data_source_var, value="upload").pack(anchor='w')
+                       variable=self.data_source_var, value="upload").pack(anchor='w', pady=5)
         
         # Buttons frame
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(pady=20)
+        button_frame = ttk.LabelFrame(left_frame, text="Load Options", padding="10")
+        button_frame.pack(fill='x', pady=10)
         
-        ttk.Button(button_frame, text="Load BOTH Data (Training + Job)", 
-                  command=self.load_both_data, width=35,
+        ttk.Button(button_frame, text="Load BOTH Data\n(Training + Job)", 
+                  command=self.load_both_data, width=30,
                   style='Accent.TButton').pack(pady=5)
         
         ttk.Separator(button_frame, orient='horizontal').pack(fill='x', pady=10)
@@ -131,23 +296,48 @@ class BBPVPMatchingGUI:
         ttk.Label(button_frame, text="Or load individually:", 
                  font=('Arial', 9, 'italic')).pack(pady=5)
         
-        ttk.Button(button_frame, text="Load Training Data (Pelatihan)", 
-                  command=self.load_training_data, width=30).pack(pady=5)
-        ttk.Button(button_frame, text="Load Job Data (Lowongan)", 
-                  command=self.load_job_data, width=30).pack(pady=5)
+        ttk.Button(button_frame, text="Load Training Data", 
+                  command=self.load_training_data, width=30).pack(pady=3)
+        ttk.Button(button_frame, text="Load Job Data", 
+                  command=self.load_job_data, width=30).pack(pady=3)
         
-        # Status text
-        self.import_status = scrolledtext.ScrolledText(main_frame, height=15, width=80)
-        self.import_status.pack(pady=10, fill='both', expand=True)
+        # Info box
+        info_frame = ttk.LabelFrame(left_frame, text="💡 Quick Guide", padding="10")
+        info_frame.pack(fill='x', pady=10)
+        
+        info_text = tk.Text(info_frame, height=8, wrap=tk.WORD, font=('Arial', 9))
+        info_text.pack(fill='x')
+        info_text.insert(1.0, 
+            "1. Select data source (GitHub or Local)\n"
+            "2. Click 'Load BOTH Data' for quick start\n"
+            "3. Or load datasets individually\n"
+            "4. Check the output panel →\n"
+            "5. Proceed to 'Preprocessing' tab\n\n"
+            "GitHub mode: Loads from online repository\n"
+            "Local mode: Upload your own files"
+        )
+        info_text.config(state='disabled')
+        
+        # Right panel - Output
+        right_frame = ttk.Frame(main_frame)
+        right_frame.pack(side='left', fill='both', expand=True)
+        
+        ttk.Label(right_frame, text="Import Status & Data Preview", 
+                 font=('Arial', 12, 'bold')).pack(pady=5)
+        
+        self.import_status = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, 
+                                                       font=('Consolas', 9))
+        self.import_status.pack(fill='both', expand=True)
         
     def create_preprocess_tab(self, parent):
         # Main frame with two columns
         main_frame = ttk.Frame(parent, padding="10")
         main_frame.pack(fill='both', expand=True)
         
-        # Left panel - Controls
-        left_frame = ttk.Frame(main_frame, width=300)
+        # Left panel - Controls (fixed width)
+        left_frame = ttk.Frame(main_frame, width=350)
         left_frame.pack(side='left', fill='y', padx=(0, 10))
+        left_frame.pack_propagate(False)  # Prevent shrinking
         
         title = ttk.Label(left_frame, text="Preprocessing Steps", font=('Arial', 14, 'bold'))
         title.pack(pady=10)
@@ -157,17 +347,17 @@ class BBPVPMatchingGUI:
         dataset_frame.pack(fill='x', pady=10)
         
         self.dataset_var = tk.StringVar(value="pelatihan")
-        ttk.Radiobutton(dataset_frame, text="Training Programs (Pelatihan)", 
-                       variable=self.dataset_var, value="pelatihan").pack(anchor='w')
-        ttk.Radiobutton(dataset_frame, text="Job Positions (Lowongan)", 
-                       variable=self.dataset_var, value="lowongan").pack(anchor='w')
+        ttk.Radiobutton(dataset_frame, text="Training Programs", 
+                       variable=self.dataset_var, value="pelatihan").pack(anchor='w', pady=3)
+        ttk.Radiobutton(dataset_frame, text="Job Positions", 
+                       variable=self.dataset_var, value="lowongan").pack(anchor='w', pady=3)
         
         # Row selection
         row_frame = ttk.LabelFrame(left_frame, text="Select Row", padding="10")
         row_frame.pack(fill='x', pady=10)
         
         ttk.Label(row_frame, text="Row Index:").pack()
-        self.row_spinbox = ttk.Spinbox(row_frame, from_=0, to=100, width=10)
+        self.row_spinbox = ttk.Spinbox(row_frame, from_=0, to=100, width=15)
         self.row_spinbox.pack(pady=5)
         self.row_spinbox.set(0)
         
@@ -187,12 +377,13 @@ class BBPVPMatchingGUI:
         for step_name, step_num in steps:
             ttk.Button(steps_frame, text=step_name, 
                       command=lambda s=step_num: self.show_preprocessing_step(s),
-                      width=25).pack(pady=2)
+                      width=28).pack(pady=2)
         
         # Process all button
-        ttk.Button(left_frame, text="Process All Data", 
+        ttk.Separator(left_frame, orient='horizontal').pack(fill='x', pady=10)
+        ttk.Button(left_frame, text="▶ Process All Data", 
                   command=self.process_all_data,
-                  style='Accent.TButton', width=25).pack(pady=20)
+                  style='Accent.TButton', width=28).pack(pady=10)
         
         # Right panel - Display
         right_frame = ttk.Frame(main_frame)
@@ -201,150 +392,140 @@ class BBPVPMatchingGUI:
         ttk.Label(right_frame, text="Preprocessing Output", 
                  font=('Arial', 12, 'bold')).pack(pady=5)
         
-        self.preprocess_output = scrolledtext.ScrolledText(right_frame, height=30, 
-                                                           wrap=tk.WORD, font=('Consolas', 10))
+        self.preprocess_output = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, 
+                                                           font=('Consolas', 9))
         self.preprocess_output.pack(fill='both', expand=True)
-        
-    def create_results_tab(self, parent):
-        main_frame = ttk.Frame(parent, padding="10")
-        main_frame.pack(fill='both', expand=True)
-        
-        title = ttk.Label(main_frame, text="Analysis Results", font=('Arial', 16, 'bold'))
-        title.pack(pady=10)
-        
-        # Statistics frame
-        stats_frame = ttk.LabelFrame(main_frame, text="Dataset Statistics", padding="10")
-        stats_frame.pack(fill='x', pady=10)
-        
-        self.stats_text = scrolledtext.ScrolledText(stats_frame, height=10, width=80)
-        self.stats_text.pack(fill='both', expand=True)
-        
-        # Visualization frame
-        viz_frame = ttk.LabelFrame(main_frame, text="Token Distribution", padding="10")
-        viz_frame.pack(fill='both', expand=True, pady=10)
-        
-        self.viz_canvas_frame = ttk.Frame(viz_frame)
-        self.viz_canvas_frame.pack(fill='both', expand=True)
-        
-        # Generate button
-        ttk.Button(main_frame, text="Generate Statistics & Visualization", 
-                  command=self.generate_statistics,
-                  style='Accent.TButton').pack(pady=10)
-    
+
     def create_tfidf_tab(self, parent):
+        # Main frame with left-right layout
         main_frame = ttk.Frame(parent, padding="10")
         main_frame.pack(fill='both', expand=True)
         
-        # Title
-        title = ttk.Label(main_frame, text="TF-IDF Calculation & Similarity", 
-                         font=('Arial', 16, 'bold'))
+        # Left panel - Controls (fixed width)
+        left_frame = ttk.Frame(main_frame, width=380)
+        left_frame.pack(side='left', fill='y', padx=(0, 10))
+        left_frame.pack_propagate(False)
+        
+        title = ttk.Label(left_frame, text="TF-IDF & Similarity", font=('Arial', 14, 'bold'))
         title.pack(pady=10)
-        
-        # Control panel
-        control_frame = ttk.Frame(main_frame)
-        control_frame.pack(fill='x', pady=10)
-        
-        # Left controls
-        left_control = ttk.Frame(control_frame)
-        left_control.pack(side='left', fill='x', expand=True)
         
         # Document selection
-        doc_frame = ttk.LabelFrame(left_control, text="Select Documents", padding="10")
-        doc_frame.pack(fill='x', pady=5)
+        doc_frame = ttk.LabelFrame(left_frame, text="Select Documents", padding="10")
+        doc_frame.pack(fill='x', pady=10)
         
-        ttk.Label(doc_frame, text="Pelatihan (Document 1):").grid(row=0, column=0, sticky='w', pady=2)
-        self.pelatihan_combo = ttk.Combobox(doc_frame, width=40, state='readonly')
-        self.pelatihan_combo.grid(row=0, column=1, padx=5, pady=2)
+        ttk.Label(doc_frame, text="Training Program:").pack(anchor='w', pady=2)
+        self.pelatihan_combo = ttk.Combobox(doc_frame, state='readonly', width=35)
+        self.pelatihan_combo.pack(fill='x', pady=5)
         
-        ttk.Label(doc_frame, text="Lowongan (Document 2):").grid(row=1, column=0, sticky='w', pady=2)
-        self.lowongan_combo = ttk.Combobox(doc_frame, width=40, state='readonly')
-        self.lowongan_combo.grid(row=1, column=1, padx=5, pady=2)
+        ttk.Label(doc_frame, text="Job Position:").pack(anchor='w', pady=2)
+        self.lowongan_combo = ttk.Combobox(doc_frame, state='readonly', width=35)
+        self.lowongan_combo.pack(fill='x', pady=5)
         
         ttk.Button(doc_frame, text="Load Document Options", 
-                  command=self.load_document_options).grid(row=2, column=0, columnspan=2, pady=5)
+                  command=self.load_document_options, width=30).pack(pady=5)
         
         # Step buttons
-        step_frame = ttk.LabelFrame(left_control, text="TF-IDF Steps", padding="10")
-        step_frame.pack(fill='x', pady=5)
+        step_frame = ttk.LabelFrame(left_frame, text="TF-IDF Steps", padding="10")
+        step_frame.pack(fill='x', pady=10)
         
         steps = [
-            ("Step 1: Show Tokens", self.show_tokens),
-            ("Step 2: Calculate TF (Term Frequency)", self.calculate_tf),
-            ("Step 3: Calculate DF (Document Frequency)", self.calculate_df),
-            ("Step 4: Calculate IDF", self.calculate_idf),
-            ("Step 5: Calculate TF-IDF", self.calculate_tfidf),
-            ("Step 6: Calculate Cosine Similarity", self.calculate_similarity),
+            ("1. Show Tokens", self.show_tokens),
+            ("2. Calculate TF", self.calculate_tf),
+            ("3. Calculate DF", self.calculate_df),
+            ("4. Calculate IDF", self.calculate_idf),
+            ("5. Calculate TF-IDF", self.calculate_tfidf),
+            ("6. Calculate Similarity", self.calculate_similarity),
         ]
         
-        for i, (step_name, command) in enumerate(steps):
+        for step_name, command in steps:
             ttk.Button(step_frame, text=step_name, command=command, 
-                      width=40).grid(row=i, column=0, pady=2, sticky='ew')
+                      width=30).pack(pady=2)
+        
+        ttk.Separator(step_frame, orient='horizontal').pack(fill='x', pady=8)
         
         ttk.Button(step_frame, text="▶ Run All Steps", 
                   command=self.run_all_tfidf_steps,
-                  style='Accent.TButton', width=40).grid(row=len(steps), column=0, pady=10, sticky='ew')
+                  style='Accent.TButton', width=30).pack(pady=5)
         
-        # Right side - Calculate All button
-        right_control = ttk.Frame(control_frame)
-        right_control.pack(side='right', padx=10)
-        
-        ttk.Button(right_control, text="Calculate All Documents\n(Full Matrix)", 
+        # Calculate all button
+        ttk.Separator(left_frame, orient='horizontal').pack(fill='x', pady=10)
+        ttk.Button(left_frame, text="Calculate All Documents\n(Full Similarity Matrix)", 
                   command=self.calculate_all_documents,
-                  style='Accent.TButton', width=25).pack(pady=5)
+                  style='Accent.TButton', width=30).pack(pady=10)
         
-        # Output area
-        output_frame = ttk.LabelFrame(main_frame, text="TF-IDF Calculation Output", padding="10")
-        output_frame.pack(fill='both', expand=True, pady=10)
+        # Right panel - Output
+        right_frame = ttk.Frame(main_frame)
+        right_frame.pack(side='left', fill='both', expand=True)
         
-        self.tfidf_output = scrolledtext.ScrolledText(output_frame, height=25, 
-                                                      wrap=tk.WORD, font=('Consolas', 9))
+        ttk.Label(right_frame, text="TF-IDF Calculation Output", 
+                 font=('Arial', 12, 'bold')).pack(pady=5)
+        
+        self.tfidf_output = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, 
+                                                      font=('Consolas', 9))
         self.tfidf_output.pack(fill='both', expand=True)
 
     def create_recommendations_tab(self, parent):
+        # Main frame with left-right layout
         main_frame = ttk.Frame(parent, padding="10")
         main_frame.pack(fill='both', expand=True)
         
-        # Title
-        title = ttk.Label(main_frame, text="Training Program Recommendations", 
-                        font=('Arial', 16, 'bold'))
+        # Left panel - Controls (fixed width)
+        left_frame = ttk.Frame(main_frame, width=400)
+        left_frame.pack(side='left', fill='y', padx=(0, 10))
+        left_frame.pack_propagate(False)
+        
+        title = ttk.Label(left_frame, text="Recommendations", font=('Arial', 14, 'bold'))
         title.pack(pady=10)
         
-        # Control panel
-        control_frame = ttk.Frame(main_frame)
-        control_frame.pack(fill='x', pady=10)
-        
-        # Left side - Single Job Recommendation
-        left_frame = ttk.LabelFrame(control_frame, text="Option 1: Single Job Recommendation", 
-                                    padding="10")
-        left_frame.pack(side='left', fill='both', expand=True, padx=(0, 5))
-        
-        ttk.Label(left_frame, text="Select Job Position:").pack(anchor='w', pady=5)
-        self.rec_job_combo = ttk.Combobox(left_frame, width=50, state='readonly')
+        # Option 1: Single Job
+        single_frame = ttk.LabelFrame(left_frame, text="Option 1: Single Job", padding="10")
+        single_frame.pack(fill='x', pady=10)
+
+        ttk.Label(single_frame, text="Select Job Position:").pack(anchor='w', pady=3)
+        self.rec_job_combo = ttk.Combobox(single_frame, state='readonly', width=35)
         self.rec_job_combo.pack(fill='x', pady=5)
-        
-        ttk.Label(left_frame, text="Number of Recommendations:").pack(anchor='w', pady=5)
-        self.rec_count_spinbox = ttk.Spinbox(left_frame, from_=1, to=20, width=10)
+
+        ttk.Label(single_frame, text="Number of Recommendations:").pack(anchor='w', pady=3)
+        self.rec_count_spinbox = ttk.Spinbox(single_frame, from_=1, to=20, width=15)
         self.rec_count_spinbox.set(5)
         self.rec_count_spinbox.pack(anchor='w', pady=5)
-        
-        ttk.Button(left_frame, text="Get Recommendations for Selected Job", 
+
+        # Add Minimum Similarity for Single Job
+        ttk.Label(single_frame, text="Minimum Similarity:").pack(anchor='w', pady=3)
+        threshold_single_frame = ttk.Frame(single_frame)
+        threshold_single_frame.pack(fill='x', pady=5)
+
+        self.rec_single_threshold_var = tk.DoubleVar(value=0.01)
+        self.rec_single_threshold_scale = ttk.Scale(threshold_single_frame, from_=0.0, to=1.0, 
+                                            variable=self.rec_single_threshold_var, 
+                                            orient='horizontal')
+        self.rec_single_threshold_scale.pack(side='left', fill='x', expand=True)
+        self.rec_single_threshold_label = ttk.Label(threshold_single_frame, text="", width=6)
+        self.rec_single_threshold_label.pack(side='right', padx=5)
+
+        def update_single_threshold_label(*args):
+            self.rec_single_threshold_label.config(text=f"{self.rec_single_threshold_var.get():.2f}")
+        self.rec_single_threshold_var.trace('w', update_single_threshold_label)
+        update_single_threshold_label()  # Initialize
+
+        ttk.Button(single_frame, text="Get Recommendations", 
                 command=self.show_single_job_recommendations,
-                style='Accent.TButton', width=40).pack(pady=10)
+                style='Accent.TButton', width=30).pack(pady=10)                
         
-        # Right side - All Jobs Recommendation
-        right_frame = ttk.LabelFrame(control_frame, text="Option 2: All Jobs Recommendation", 
-                                    padding="10")
-        right_frame.pack(side='right', fill='both', expand=True, padx=(5, 0))
+        # Option 2: All Jobs
+        all_frame = ttk.LabelFrame(left_frame, text="Option 2: All Jobs", padding="10")
+        all_frame.pack(fill='x', pady=10)
         
-        ttk.Label(right_frame, text="Top N recommendations per job:").pack(anchor='w', pady=5)
-        self.rec_all_count_spinbox = ttk.Spinbox(right_frame, from_=1, to=10, width=10)
+        ttk.Label(all_frame, text="Top N per job:").pack(anchor='w', pady=3)
+        self.rec_all_count_spinbox = ttk.Spinbox(all_frame, from_=1, to=10, width=15)
         self.rec_all_count_spinbox.set(3)
         self.rec_all_count_spinbox.pack(anchor='w', pady=5)
         
-        ttk.Label(right_frame, text="Minimum Similarity Threshold:").pack(anchor='w', pady=5)
-        threshold_frame = ttk.Frame(right_frame)
+        ttk.Label(all_frame, text="Minimum Similarity:").pack(anchor='w', pady=3)
+        threshold_frame = ttk.Frame(all_frame)
         threshold_frame.pack(fill='x', pady=5)
-        self.rec_threshold_var = tk.DoubleVar(value=0.0)
+        
+        self.rec_threshold_var = tk.DoubleVar(value=0.01)
         self.rec_threshold_scale = ttk.Scale(threshold_frame, from_=0.0, to=1.0, 
                                             variable=self.rec_threshold_var, 
                                             orient='horizontal')
@@ -352,41 +533,120 @@ class BBPVPMatchingGUI:
         self.rec_threshold_label = ttk.Label(threshold_frame, text="0.00", width=6)
         self.rec_threshold_label.pack(side='right', padx=5)
         
-        # Update label when scale changes
         def update_threshold_label(*args):
             self.rec_threshold_label.config(text=f"{self.rec_threshold_var.get():.2f}")
         self.rec_threshold_var.trace('w', update_threshold_label)
         
-        ttk.Button(right_frame, text="Get Recommendations for ALL Jobs", 
+        update_threshold_label()  
+
+        ttk.Button(all_frame, text="Get All Recommendations", 
                 command=self.show_all_jobs_recommendations,
-                style='Accent.TButton', width=40).pack(pady=10)
+                style='Accent.TButton', width=30).pack(pady=10)
         
-        # Buttons frame
-        button_frame = ttk.Frame(right_frame)
-        button_frame.pack(fill='x', pady=5)
+        # Export buttons
+        export_frame = ttk.LabelFrame(left_frame, text="Export Results", padding="10")
+        export_frame.pack(fill='x', pady=10)
         
-        ttk.Button(button_frame, text="Export to Excel", 
+        ttk.Button(export_frame, text="📊 Export to Excel", 
                 command=self.export_recommendations_excel,
-                width=19).pack(side='left', padx=2)
-        ttk.Button(button_frame, text="Export to CSV", 
+                width=30).pack(pady=3)
+        ttk.Button(export_frame, text="📄 Export to CSV", 
                 command=self.export_recommendations_csv,
-                width=19).pack(side='right', padx=2)
+                width=30).pack(pady=3)
         
-        # Output area with scrollbar
-        output_frame = ttk.LabelFrame(main_frame, text="Recommendation Results", padding="10")
-        output_frame.pack(fill='both', expand=True, pady=10)
+        # Info
+        info_text = tk.Text(left_frame, height=4, wrap=tk.WORD, font=('Arial', 8))
+        info_text.pack(fill='x', pady=10)
+        info_text.insert(1.0, 
+            "💡 Make sure to:\n"
+            "1. Import data (Tab 1)\n"
+            "2. Preprocess (Tab 2)\n"
+            "3. Calculate similarity (Tab 3)"
+        )
+        info_text.config(state='disabled')
         
-        # Create text widget with scrollbar
-        self.rec_output = scrolledtext.ScrolledText(output_frame, height=25, 
-                                                    wrap=tk.WORD, font=('Consolas', 9))
+        # Right panel - Output
+        right_frame = ttk.Frame(main_frame)
+        right_frame.pack(side='left', fill='both', expand=True)
+        
+        ttk.Label(right_frame, text="Recommendation Results", 
+                 font=('Arial', 12, 'bold')).pack(pady=5)
+        
+        self.rec_output = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, 
+                                                    font=('Consolas', 9))
         self.rec_output.pack(fill='both', expand=True)
         
-        # Info label
-        info_label = ttk.Label(main_frame, 
-                            text="💡 Tip: Process data in tabs 1-2, then calculate similarity in tab 3 before getting recommendations",
-                            font=('Arial', 9, 'italic'))
-        info_label.pack(pady=5)
-
+    def create_results_tab(self, parent):
+        # Main frame with left-right layout
+        main_frame = ttk.Frame(parent, padding="10")
+        main_frame.pack(fill='both', expand=True)
+        
+        # Left panel - Controls (fixed width)
+        left_frame = ttk.Frame(main_frame, width=350)
+        left_frame.pack(side='left', fill='y', padx=(0, 10))
+        left_frame.pack_propagate(False)
+        
+        title = ttk.Label(left_frame, text="Analysis Tools", font=('Arial', 14, 'bold'))
+        title.pack(pady=10)
+        
+        # Statistics section
+        stats_section = ttk.LabelFrame(left_frame, text="Available Analysis", padding="10")
+        stats_section.pack(fill='x', pady=10)
+        
+        ttk.Button(stats_section, text="📊 Generate Statistics", 
+                  command=self.generate_statistics,
+                  style='Accent.TButton', width=28).pack(pady=5)
+        
+        ttk.Label(stats_section, text="Shows:", font=('Arial', 9)).pack(anchor='w', pady=5)
+        features = [
+            "• Dataset summaries",
+            "• Token statistics",
+            "• Distribution charts"
+        ]
+        for feature in features:
+            ttk.Label(stats_section, text=feature, font=('Arial', 8)).pack(anchor='w', padx=10)
+        
+        # Info section
+        info_frame = ttk.LabelFrame(left_frame, text="💡 About This Tab", padding="10")
+        info_frame.pack(fill='x', pady=10)
+        
+        info_text = tk.Text(info_frame, height=12, wrap=tk.WORD, font=('Arial', 9))
+        info_text.pack(fill='x')
+        info_text.insert(1.0,
+            "This tab provides statistical analysis "
+            "of your processed datasets.\n\n"
+            "You can view:\n"
+            "• Total records\n"
+            "• Token counts\n"
+            "• Statistical measures\n"
+            "• Visual distributions\n\n"
+            "Make sure to process your data "
+            "in Tab 2 first!"
+        )
+        info_text.config(state='disabled')
+        
+        # Right panel - Display (split into stats and viz)
+        right_frame = ttk.Frame(main_frame)
+        right_frame.pack(side='left', fill='both', expand=True)
+        
+        ttk.Label(right_frame, text="Analysis Results", 
+                 font=('Arial', 12, 'bold')).pack(pady=5)
+        
+        # Statistics text
+        stats_frame = ttk.LabelFrame(right_frame, text="Dataset Statistics", padding="5")
+        stats_frame.pack(fill='x', pady=5)
+        
+        self.stats_text = scrolledtext.ScrolledText(stats_frame, height=10, 
+                                                    wrap=tk.WORD, font=('Consolas', 9))
+        self.stats_text.pack(fill='both', expand=True)
+        
+        # Visualization frame
+        viz_frame = ttk.LabelFrame(right_frame, text="Token Distribution Charts", padding="5")
+        viz_frame.pack(fill='both', expand=True, pady=5)
+        
+        self.viz_canvas_frame = ttk.Frame(viz_frame)
+        self.viz_canvas_frame.pack(fill='both', expand=True)
+		
     def log_message(self, message, widget=None):
         """Log message to specified widget or import_status"""
         if widget is None:
@@ -395,6 +655,173 @@ class BBPVPMatchingGUI:
         widget.see(tk.END)
         self.root.update()
     
+    def connect_to_database(self):
+        """Connect to MySQL database"""
+        try:
+            self.db_connection = mysql.connector.connect(**self.db_config)
+            
+            if self.db_connection.is_connected():
+                print("✓ Connected to MySQL database")
+                if hasattr(self, 'db_log_output'):
+                    self.log_message(f"✓ Connected to MySQL database", self.db_log_output)
+                    self.log_message(f"  Host: {self.db_config['host']}:{self.db_config['port']}", 
+                                self.db_log_output)
+                    self.log_message(f"  Database: {self.db_config['database']}\n", 
+                                self.db_log_output)
+        except Error as e:
+            print(f"✗ Database connection error: {e}")
+            if hasattr(self, 'db_log_output'):
+                self.log_message(f"✗ Database connection error: {e}\n", self.db_log_output)
+            self.db_connection = None
+
+    def save_db_config(self):
+        """Save database configuration"""
+        try:
+            self.db_config['host'] = self.db_host_entry.get().strip()
+            self.db_config['port'] = int(self.db_port_entry.get().strip())
+            self.db_config['database'] = self.db_name_entry.get().strip()
+            self.db_config['user'] = self.db_user_entry.get().strip()
+            self.db_config['password'] = self.db_password_entry.get()
+            
+            self.log_message("✓ Configuration saved successfully!", self.db_log_output)
+            self.log_message(f"  Host: {self.db_config['host']}", self.db_log_output)
+            self.log_message(f"  Port: {self.db_config['port']}", self.db_log_output)
+            self.log_message(f"  Database: {self.db_config['database']}", self.db_log_output)
+            self.log_message(f"  User: {self.db_config['user']}\n", self.db_log_output)
+            
+            messagebox.showinfo("Success", "Database configuration saved!\nClick 'Reconnect' to apply changes.")
+        except ValueError:
+            messagebox.showerror("Error", "Port must be a valid number!")
+
+    def test_db_connection(self):
+        """Test database connection with current settings"""
+        self.log_message("=" * 80, self.db_log_output)
+        self.log_message("TESTING DATABASE CONNECTION", self.db_log_output)
+        self.log_message("=" * 80, self.db_log_output)
+        
+        try:
+            # Get current form values
+            test_config = {
+                'host': self.db_host_entry.get().strip(),
+                'port': int(self.db_port_entry.get().strip()),
+                'database': self.db_name_entry.get().strip(),
+                'user': self.db_user_entry.get().strip(),
+                'password': self.db_password_entry.get(),
+                'charset': 'utf8mb4',
+                'use_unicode': True
+            }
+            
+            self.log_message(f"\nConnecting to:", self.db_log_output)
+            self.log_message(f"  Host: {test_config['host']}", self.db_log_output)
+            self.log_message(f"  Port: {test_config['port']}", self.db_log_output)
+            self.log_message(f"  Database: {test_config['database']}", self.db_log_output)
+            self.log_message(f"  User: {test_config['user']}\n", self.db_log_output)
+            
+            # Attempt connection
+            test_conn = mysql.connector.connect(**test_config)
+            
+            if test_conn.is_connected():
+                db_info = test_conn.get_server_info()
+                cursor = test_conn.cursor()
+                cursor.execute("SELECT DATABASE();")
+                db_name = cursor.fetchone()
+                
+                self.log_message("✅ CONNECTION SUCCESSFUL!", self.db_log_output)
+                self.log_message(f"  MySQL Server Version: {db_info}", self.db_log_output)
+                self.log_message(f"  Connected to database: {db_name[0]}\n", self.db_log_output)
+                
+                # Check tables
+                cursor.execute("SHOW TABLES;")
+                tables = cursor.fetchall()
+                self.log_message(f"  Tables found: {len(tables)}", self.db_log_output)
+                for table in tables:
+                    self.log_message(f"    - {table[0]}", self.db_log_output)
+                
+                cursor.close()
+                test_conn.close()
+                
+                messagebox.showinfo("Success", 
+                                f"Connection successful!\n\n"
+                                f"Server: {db_info}\n"
+                                f"Database: {db_name[0]}\n"
+                                f"Tables: {len(tables)}")
+            
+        except Error as e:
+            self.log_message(f"\n❌ CONNECTION FAILED!", self.db_log_output)
+            self.log_message(f"Error: {str(e)}\n", self.db_log_output)
+            messagebox.showerror("Connection Failed", 
+                            f"Could not connect to database:\n\n{str(e)}\n\n"
+                            f"Please check your settings and try again.")
+        except ValueError:
+            messagebox.showerror("Error", "Port must be a valid number!")
+
+    def reconnect_database(self):
+        """Reconnect to database with new settings"""
+        self.log_message("=" * 80, self.db_log_output)
+        self.log_message("RECONNECTING TO DATABASE", self.db_log_output)
+        self.log_message("=" * 80 + "\n", self.db_log_output)
+        
+        # Close existing connection
+        if self.db_connection and self.db_connection.is_connected():
+            self.db_connection.close()
+            self.log_message("✓ Closed existing connection", self.db_log_output)
+        
+        # Save configuration
+        self.save_db_config()
+        
+        # Reconnect
+        self.connect_to_database()
+        self.update_db_status()
+
+    def reset_db_config(self):
+        """Reset to default database configuration"""
+        if messagebox.askyesno("Confirm Reset", 
+                            "Reset database configuration to defaults?"):
+            self.db_host_entry.delete(0, tk.END)
+            self.db_host_entry.insert(0, 'localhost')
+            
+            self.db_port_entry.delete(0, tk.END)
+            self.db_port_entry.insert(0, '3307')
+            
+            self.db_name_entry.delete(0, tk.END)
+            self.db_name_entry.insert(0, 'bbpvp_thesis')
+            
+            self.db_user_entry.delete(0, tk.END)
+            self.db_user_entry.insert(0, 'root')
+            
+            self.db_password_entry.delete(0, tk.END)
+            
+            self.log_message("✓ Configuration reset to defaults\n", self.db_log_output)
+            messagebox.showinfo("Reset", "Configuration reset to defaults!")
+
+    def update_db_status(self):
+        """Update database connection status display"""
+        if not hasattr(self, 'db_status_label'):
+            return
+        
+        if self.db_connection and self.db_connection.is_connected():
+            self.db_status_label.config(text="🟢 Connected", foreground='green')
+            
+            status_text = (
+                f"Host: {self.db_config['host']}:{self.db_config['port']}\n"
+                f"Database: {self.db_config['database']}\n"
+                f"User: {self.db_config['user']}\n"
+                f"Status: Active"
+            )
+        else:
+            self.db_status_label.config(text="🔴 Disconnected", foreground='red')
+            
+            status_text = (
+                f"Status: Not connected\n"
+                f"Please check configuration and\n"
+                f"click 'Test Connection' or 'Reconnect'"
+            )
+        
+        self.db_status_detail.config(state='normal')
+        self.db_status_detail.delete(1.0, tk.END)
+        self.db_status_detail.insert(1.0, status_text)
+        self.db_status_detail.config(state='disabled')
+
     def load_both_data(self):
         """Load both training and job data at once"""
         if self.data_source_var.get() != "github":
@@ -451,6 +878,11 @@ class BBPVPMatchingGUI:
                                   f"Training: {len(self.df_pelatihan)} records\n"
                                   f"Jobs: {len(self.df_lowongan)} records")
                 
+                self.create_experiment(
+                    "Data Import Session",
+                    f"Loaded {len(self.df_pelatihan)} training programs and {len(self.df_lowongan)} jobs"
+                )
+
             except Exception as e:
                 self.log_message(f"\n✗ Error: {str(e)}")
                 messagebox.showerror("Error", f"Failed to load data:\n{str(e)}")
@@ -991,6 +1423,9 @@ class BBPVPMatchingGUI:
         self.log_message("  • 0.00-0.50 = Low similarity", self.tfidf_output)
         
         self.current_similarity = similarity
+
+        pel_idx, low_idx = self.get_selected_documents()
+        self.save_tfidf_calculation(pel_idx, low_idx)        
     
     def run_all_tfidf_steps(self):
         """Run all TF-IDF steps sequentially"""
@@ -1008,17 +1443,88 @@ class BBPVPMatchingGUI:
         for step in steps:
             step()
             self.root.update()
-    
+
+    def save_tfidf_sample_from_sklearn(self, vectorizer, tfidf_matrix, pel_idx, low_idx, similarity):
+        """Save TF-IDF calculation sample from sklearn results"""
+        if not self.current_experiment_id or not self.db_connection:
+            return
+        
+        try:
+            cursor = self.db_connection.cursor()
+            
+            training_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
+            job_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan']
+            
+            # Get feature names (terms)
+            feature_names = vectorizer.get_feature_names_out()
+            
+            # Get TF-IDF vectors for these documents
+            n_pelatihan = len(self.df_pelatihan)
+            training_vector = tfidf_matrix[pel_idx].toarray()[0]
+            job_vector = tfidf_matrix[n_pelatihan + low_idx].toarray()[0]
+            
+            # Build simplified JSON structures (only non-zero values)
+            tfidf_training = {term: float(training_vector[i]) 
+                            for i, term in enumerate(feature_names) 
+                            if training_vector[i] > 0}
+            
+            tfidf_job = {term: float(job_vector[i]) 
+                        for i, term in enumerate(feature_names) 
+                        if job_vector[i] > 0}
+            
+            # Get unique terms from both documents
+            unique_terms = sorted(set(list(tfidf_training.keys()) + list(tfidf_job.keys())))
+            
+            query = """
+            INSERT INTO tfidf_calculations 
+            (experiment_id, training_index, training_name, job_index, job_name,
+            unique_terms_count, terms_json, tfidf_training_json, tfidf_job_json, cosine_similarity)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            
+            values = (
+                self.current_experiment_id,
+                int(pel_idx),
+                training_name,
+                int(low_idx),
+                job_name,
+                len(unique_terms),
+                json.dumps(unique_terms),
+                json.dumps(tfidf_training),
+                json.dumps(tfidf_job),
+                float(similarity)
+            )
+            
+            cursor.execute(query, values)
+            self.db_connection.commit()
+            cursor.close()
+            
+        except Error as e:
+            print(f"✗ Error saving TF-IDF sample: {e}")
+
     def calculate_all_documents(self):
         """Calculate similarity matrix for all documents"""
+        # Check if data is loaded
         if self.df_pelatihan is None or self.df_lowongan is None:
-            messagebox.showwarning("Warning", "Please load and preprocess data first!")
+            messagebox.showwarning("Warning", "Please load data first!\nGo to 'Import Data' tab.")
             return
         
-        if 'preprocessed_text' not in self.df_pelatihan.columns:
-            messagebox.showwarning("Warning", "Please preprocess data first!")
+        # Check if preprocessing is done
+        if 'preprocessed_text' not in self.df_pelatihan.columns or 'preprocessed_text' not in self.df_lowongan.columns:
+            messagebox.showwarning("Warning", 
+                                "Please preprocess data first!\n\n"
+                                "Go to 'Preprocessing' tab and click:\n"
+                                "'▶ Process All Data'")
             return
         
+        # Check if preprocessed data is not empty
+        if self.df_pelatihan['preprocessed_text'].isna().all() or self.df_lowongan['preprocessed_text'].isna().all():
+            messagebox.showwarning("Warning", 
+                                "Preprocessing data is empty!\n\n"
+                                "Please run preprocessing again.")
+            return
+        
+        # Existing code continues...
         self.tfidf_output.delete(1.0, tk.END)
         self.log_message("Calculating similarity matrix for all documents...", self.tfidf_output)
         self.log_message("This may take a moment...\n", self.tfidf_output)
@@ -1029,7 +1535,7 @@ class BBPVPMatchingGUI:
         
         # Combine all texts
         all_texts = list(self.df_pelatihan['preprocessed_text']) + \
-                   list(self.df_lowongan['preprocessed_text'])
+                list(self.df_lowongan['preprocessed_text'])
         
         # Calculate TF-IDF
         vectorizer = TfidfVectorizer()
@@ -1044,36 +1550,138 @@ class BBPVPMatchingGUI:
         similarity_matrix = cosine_similarity(pelatihan_vectors, lowongan_vectors)
         
         # Display results
-        self.log_message("=" * 80, self.tfidf_output)
+        self.log_message("=" * 150, self.tfidf_output)
         self.log_message("SIMILARITY MATRIX - ALL DOCUMENTS", self.tfidf_output)
-        self.log_message("=" * 80, self.tfidf_output)
-        self.log_message(f"\nTotal Pelatihan: {n_pelatihan}", self.tfidf_output)
-        self.log_message(f"Total Lowongan: {len(self.df_lowongan)}", self.tfidf_output)
-        self.log_message(f"Matrix shape: {similarity_matrix.shape}", self.tfidf_output)
+        self.log_message("=" * 150, self.tfidf_output)
+        self.log_message(f"\n📊 Matrix Information:", self.tfidf_output)
+        self.log_message(f"   • Total Training Programs: {n_pelatihan}", self.tfidf_output)
+        self.log_message(f"   • Total Job Positions: {len(self.df_lowongan)}", self.tfidf_output)
+        self.log_message(f"   • Matrix Shape: {similarity_matrix.shape} (rows × columns)", self.tfidf_output)
+        self.log_message(f"   • Total Calculations: {similarity_matrix.size} similarity scores", self.tfidf_output)
+        self.log_message(f"   • Unique Terms in Vocabulary: {len(vectorizer.vocabulary_)}", self.tfidf_output)
         
-        # Top matches for each lowongan
-        self.log_message("\n" + "=" * 80, self.tfidf_output)
-        self.log_message("TOP RECOMMENDATIONS FOR EACH JOB POSITION", self.tfidf_output)
-        self.log_message("=" * 80, self.tfidf_output)
+        # Statistics
+        avg_similarity = similarity_matrix.mean()
+        max_similarity = similarity_matrix.max()
+        min_similarity = similarity_matrix.min()
         
+        self.log_message(f"\n📈 Similarity Statistics:", self.tfidf_output)
+        self.log_message(f"   • Average Similarity: {avg_similarity:.4f} ({avg_similarity*100:.2f}%)", self.tfidf_output)
+        self.log_message(f"   • Maximum Similarity: {max_similarity:.4f} ({max_similarity*100:.2f}%)", self.tfidf_output)
+        self.log_message(f"   • Minimum Similarity: {min_similarity:.4f} ({min_similarity*100:.2f}%)", self.tfidf_output)
+        
+        # Count by match levels
+        excellent = np.sum(similarity_matrix >= 0.80)
+        very_good = np.sum((similarity_matrix >= 0.65) & (similarity_matrix < 0.80))
+        good = np.sum((similarity_matrix >= 0.50) & (similarity_matrix < 0.65))
+        fair = np.sum((similarity_matrix >= 0.35) & (similarity_matrix < 0.50))
+        weak = np.sum(similarity_matrix < 0.35)
+        
+        self.log_message(f"\n🎯 Match Level Distribution:", self.tfidf_output)
+        self.log_message(f"   • 🟢 Excellent (≥80%): {excellent} pairs ({excellent/similarity_matrix.size*100:.1f}%)", self.tfidf_output)
+        self.log_message(f"   • 🟢 Very Good (65-79%): {very_good} pairs ({very_good/similarity_matrix.size*100:.1f}%)", self.tfidf_output)
+        self.log_message(f"   • 🟡 Good (50-64%): {good} pairs ({good/similarity_matrix.size*100:.1f}%)", self.tfidf_output)
+        self.log_message(f"   • 🟡 Fair (35-49%): {fair} pairs ({fair/similarity_matrix.size*100:.1f}%)", self.tfidf_output)
+        self.log_message(f"   • 🔴 Weak (<35%): {weak} pairs ({weak/similarity_matrix.size*100:.1f}%)", self.tfidf_output)
+        
+        # Top matches for each job - SQL TABLE FORMAT
+        self.log_message("\n\n" + "=" * 150, self.tfidf_output)
+        self.log_message("TOP 3 TRAINING PROGRAMS FOR EACH JOB POSITION", self.tfidf_output)
+        self.log_message("=" * 150, self.tfidf_output)
+        
+        # Table header
+        self.log_message(
+            f"\n┌{'─' * 6}┬{'─' * 45}┬{'─' * 55}┬{'─' * 6}┬{'─' * 13}┬{'─' * 10}┬{'─' * 12}┐",
+            self.tfidf_output
+        )
+        self.log_message(
+            f"│ {'Job':<4} │ {'Job Position':<43} │ {'Training Program':<53} │ {'Rank':<4} │ {'Similarity':<11} │ {'Score %':<8} │ {'Match':<10} │",
+            self.tfidf_output
+        )
+        self.log_message(
+            f"│ {'Idx':<4} │ {'':<43} │ {'':<53} │ {'':<4} │ {'Score':<11} │ {'':<8} │ {'Level':<10} │",
+            self.tfidf_output
+        )
+        self.log_message(
+            f"├{'─' * 6}┼{'─' * 45}┼{'─' * 55}┼{'─' * 6}┼{'─' * 13}┼{'─' * 10}┼{'─' * 12}┤",
+            self.tfidf_output
+        )
+        
+        # Process each job
         for low_idx in range(len(self.df_lowongan)):
             lowongan_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan']
             similarities = similarity_matrix[:, low_idx]
             top_3_indices = np.argsort(similarities)[-3:][::-1]
             
-            self.log_message(f"\n📋 {lowongan_name}", self.tfidf_output)
-            self.log_message("   Recommended training programs:", self.tfidf_output)
             for rank, pel_idx in enumerate(top_3_indices, 1):
                 pelatihan_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
                 sim_score = similarities[pel_idx]
-                self.log_message(f"   {rank}. {pelatihan_name} (Similarity: {sim_score:.4f})", 
-                               self.tfidf_output)
+                
+                # Determine match level
+                if sim_score >= 0.80:
+                    match_level = "excellent"
+                    match_emoji = "🟢"
+                elif sim_score >= 0.65:
+                    match_level = "very_good"
+                    match_emoji = "🟢"
+                elif sim_score >= 0.50:
+                    match_level = "good"
+                    match_emoji = "🟡"
+                elif sim_score >= 0.35:
+                    match_level = "fair"
+                    match_emoji = "🟡"
+                else:
+                    match_level = "weak"
+                    match_emoji = "🔴"
+                
+                # Truncate names if too long
+                job_display = lowongan_name[:41] + ".." if len(lowongan_name) > 43 else lowongan_name
+                program_display = pelatihan_name[:51] + ".." if len(pelatihan_name) > 53 else pelatihan_name
+                
+                self.log_message(
+                    f"│ {low_idx:<4} │ {job_display:<43} │ {program_display:<53} │ {rank:<4} │ {sim_score:<11.8f} │ {sim_score*100:<8.2f} │ {match_emoji} {match_level:<8} │",
+                    self.tfidf_output
+                )
         
-        messagebox.showinfo("Complete", "Similarity calculation completed!")
+        # Table footer
+        self.log_message(
+            f"└{'─' * 6}┴{'─' * 45}┴{'─' * 55}┴{'─' * 6}┴{'─' * 13}┴{'─' * 10}┴{'─' * 12}┘",
+            self.tfidf_output
+        )
+        
+        # Completion message
+        self.log_message("\n" + "=" * 150, self.tfidf_output)
+        self.log_message("✅ SIMILARITY CALCULATION COMPLETED", self.tfidf_output)
+        self.log_message("=" * 150, self.tfidf_output)
+        self.log_message(f"\nTimestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", self.tfidf_output)
+        self.log_message(f"💡 You can now proceed to the 'Recommendations' tab to get detailed recommendations", self.tfidf_output)
+                
+        messagebox.showinfo("Complete", 
+                        f"Similarity calculation completed!\n\n"
+                        f"• {similarity_matrix.size} similarity scores calculated\n"
+                        f"• Average similarity: {avg_similarity:.2%}\n"
+                        f"• Ready for recommendations")
         
         # Store for later use
         self.similarity_matrix = similarity_matrix
-    
+        self.save_similarity_matrix()
+
+        self.log_message("\nSaving sample TF-IDF calculations to database...", self.tfidf_output)
+        sample_count = min(5, len(self.df_lowongan))
+        
+        for low_idx in range(sample_count):
+            similarities = similarity_matrix[:, low_idx]
+            top_pel_idx = np.argmax(similarities)
+            self.save_tfidf_sample_from_sklearn(
+                vectorizer, 
+                tfidf_matrix, 
+                top_pel_idx, 
+                low_idx, 
+                similarities[top_pel_idx]
+            )
+        
+        self.log_message(f"✓ Saved {sample_count} TF-IDF calculation samples", self.tfidf_output)
+
     def show_preprocessing_step(self, step):
         """Show specific preprocessing step for selected row"""
         self.preprocess_output.delete(1.0, tk.END)
@@ -1324,6 +1932,17 @@ class BBPVPMatchingGUI:
             # self.log_message("\nYou can now view statistics in the 'Results & Analysis' tab.", 
             #                self.preprocess_output)
         
+            if self.df_pelatihan is not None:
+                # Save samples for thesis based on self.total_saved_sample variable
+                for idx in range(min(self.total_saved_sample, len(self.df_pelatihan))):
+                    self.save_preprocessing_sample('training', idx, self.df_pelatihan.iloc[idx])
+
+            if self.df_lowongan is not None:
+                for idx in range(min(self.total_saved_sample, len(self.df_lowongan))):
+                    self.save_preprocessing_sample('job', idx, self.df_lowongan.iloc[idx])
+
+            self.log_message("✓ Preprocessing samples saved to database", self.preprocess_output)
+
         threading.Thread(target=process, daemon=True).start()
 
     def load_recommendation_options(self):
@@ -1360,64 +1979,108 @@ class BBPVPMatchingGUI:
         try:
             job_idx = int(self.rec_job_combo.get().split(':')[0])
             n_recommendations = int(self.rec_count_spinbox.get())
+            threshold = float(self.rec_single_threshold_var.get())
         except:
             messagebox.showerror("Error", "Please select a job position!")
             return
         
         job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan']
         job_desc = self.df_lowongan.iloc[job_idx].get('Deskripsi KBJI', 'N/A')
-        
+                
         # Get similarities for this job
         similarities = self.similarity_matrix[:, job_idx]
         
-        # Get top N recommendations
-        top_indices = np.argsort(similarities)[-n_recommendations:][::-1]
+        # Filter by threshold first, then get top N
+        filtered_indices = [i for i in range(len(similarities)) if similarities[i] >= threshold]
         
-        # Display results
-        self.log_message("=" * 100, self.rec_output)
+        if not filtered_indices:
+            self.log_message("=" * 150, self.rec_output)
+            self.log_message("NO RECOMMENDATIONS FOUND", self.rec_output)
+            self.log_message("=" * 150, self.rec_output)
+            self.log_message(f"\n❌ No training programs found with similarity >= {threshold:.2f}", 
+                            self.rec_output)
+            self.log_message(f"\nTry lowering the minimum similarity threshold.", self.rec_output)
+            return
+        
+        # Sort filtered indices by similarity and take top N
+        filtered_indices.sort(key=lambda i: similarities[i], reverse=True)
+        top_indices = filtered_indices[:n_recommendations]
+        
+        # Display header
+        self.log_message("=" * 150, self.rec_output)
         self.log_message("TRAINING PROGRAM RECOMMENDATIONS - SINGLE JOB", self.rec_output)
-        self.log_message("=" * 100, self.rec_output)
+        self.log_message("=" * 150, self.rec_output)
         
-        self.log_message(f"\n🎯 JOB POSITION:", self.rec_output)
-        self.log_message(f"   {job_name}", self.rec_output)
-        self.log_message(f"\n📄 Job Description:", self.rec_output)
-        self.log_message(f"   {job_desc[:200]}...", self.rec_output)
+        self.log_message(f"\n🎯 JOB POSITION: {job_name}", self.rec_output)
+        self.log_message(f"📄 Description: {job_desc[:120]}...", self.rec_output)
         
-        self.log_message(f"\n\n📊 TOP {n_recommendations} RECOMMENDED TRAINING PROGRAMS:", self.rec_output)
-        self.log_message("=" * 100, self.rec_output)
+        self.log_message(f"\n⚙️  Settings: Top N = {n_recommendations} | Threshold = {threshold:.2f} | Found = {len(filtered_indices)} programs", self.rec_output)
         
+        # Display as SQL-style table
+        self.log_message(f"\n\n📊 RECOMMENDATION RESULTS (Showing {len(top_indices)} of {len(filtered_indices)} matches):", self.rec_output)
+        self.log_message("=" * 150, self.rec_output)
+        
+        # Table header
+        self.log_message(
+            f"┌{'─' * 6}┬{'─' * 45}┬{'─' * 55}┬{'─' * 6}┬{'─' * 13}┬{'─' * 10}┬{'─' * 12}┐",
+            self.rec_output
+        )
+        self.log_message(
+            f"│ {'Job':<4} │ {'Job Name':<43} │ {'Training Program':<53} │ {'Rank':<4} │ {'Similarity':<11} │ {'Score %':<8} │ {'Match':<10} │",
+            self.rec_output
+        )
+        self.log_message(
+            f"│ {'Idx':<4} │ {'':<43} │ {'':<53} │ {'':<4} │ {'Score':<11} │ {'':<8} │ {'Level':<10} │",
+            self.rec_output
+        )
+        self.log_message(
+            f"├{'─' * 6}┼{'─' * 45}┼{'─' * 55}┼{'─' * 6}┼{'─' * 13}┼{'─' * 10}┼{'─' * 12}┤",
+            self.rec_output
+        )
+        
+        # Table rows
         for rank, pel_idx in enumerate(top_indices, 1):
             program_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
             similarity = similarities[pel_idx]
-            tujuan = self.df_pelatihan.iloc[pel_idx].get('Tujuan/Kompetensi', 'N/A')
             
-            # Similarity interpretation
+            # Determine match level
             if similarity >= 0.80:
-                match_level = "⭐⭐⭐⭐⭐ EXCELLENT MATCH"
-                color_marker = "🟢"
+                match_level = "excellent"
+                match_emoji = "🟢"
             elif similarity >= 0.65:
-                match_level = "⭐⭐⭐⭐ VERY GOOD MATCH"
-                color_marker = "🟢"
+                match_level = "very_good"
+                match_emoji = "🟢"
             elif similarity >= 0.50:
-                match_level = "⭐⭐⭐ GOOD MATCH"
-                color_marker = "🟡"
+                match_level = "good"
+                match_emoji = "🟡"
             elif similarity >= 0.35:
-                match_level = "⭐⭐ FAIR MATCH"
-                color_marker = "🟡"
+                match_level = "fair"
+                match_emoji = "🟡"
             else:
-                match_level = "⭐ WEAK MATCH"
-                color_marker = "🔴"
+                match_level = "weak"
+                match_emoji = "🔴"
             
-            self.log_message(f"\n{color_marker} RANK #{rank}", self.rec_output)
-            self.log_message(f"{'─' * 100}", self.rec_output)
-            self.log_message(f"Program      : {program_name}", self.rec_output)
-            self.log_message(f"Similarity   : {similarity:.4f} ({similarity*100:.2f}%)", self.rec_output)
-            self.log_message(f"Match Level  : {match_level}", self.rec_output)
-            self.log_message(f"Objective    : {tujuan[:150]}...", self.rec_output)
+            # Truncate names if too long
+            job_display = job_name[:41] + ".." if len(job_name) > 43 else job_name
+            program_display = program_name[:51] + ".." if len(program_name) > 53 else program_name
+            
+            self.log_message(
+                f"│ {job_idx:<4} │ {job_display:<43} │ {program_display:<53} │ {rank:<4} │ {similarity:<11.8f} │ {similarity*100:<8.2f} │ {match_emoji} {match_level:<8} │",
+                self.rec_output
+            )
         
-        self.log_message("\n" + "=" * 100, self.rec_output)
+        # Table footer
+        self.log_message(
+            f"└{'─' * 6}┴{'─' * 45}┴{'─' * 55}┴{'─' * 6}┴{'─' * 13}┴{'─' * 10}┴{'─' * 12}┘",
+            self.rec_output
+        )
+        
+        # Summary
+        self.log_message("\n" + "=" * 150, self.rec_output)
         self.log_message("✅ RECOMMENDATION COMPLETE", self.rec_output)
-        self.log_message("=" * 100, self.rec_output)
+        self.log_message("=" * 150, self.rec_output)
+        self.log_message(f"\n💡 Results: {len(top_indices)} recommendations displayed | Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
+                        self.rec_output)
 
     def show_all_jobs_recommendations(self):
         """Show recommendations for all jobs"""
@@ -1439,17 +2102,32 @@ class BBPVPMatchingGUI:
             return
         
         # Display header
-        self.log_message("=" * 100, self.rec_output)
+        self.log_message("=" * 150, self.rec_output)
         self.log_message("TRAINING PROGRAM RECOMMENDATIONS - ALL JOBS", self.rec_output)
-        self.log_message("=" * 100, self.rec_output)
-        self.log_message(f"\n📊 Settings:", self.rec_output)
-        self.log_message(f"   • Top N recommendations per job: {n_recommendations}", self.rec_output)
-        self.log_message(f"   • Minimum similarity threshold: {threshold:.2f}", self.rec_output)
-        self.log_message(f"   • Total job positions: {len(self.df_lowongan)}", self.rec_output)
-        self.log_message(f"   • Total training programs: {len(self.df_pelatihan)}", self.rec_output)
+        self.log_message("=" * 150, self.rec_output)
+        self.log_message(f"\n📊 Configuration: Top N = {n_recommendations} per job | Threshold = {threshold:.2f} | Jobs = {len(self.df_lowongan)} | Programs = {len(self.df_pelatihan)}", self.rec_output)
         
         # Store all recommendations for export
         self.all_recommendations = []
+        
+        # SQL-style table header
+        self.log_message("\n" + "=" * 150, self.rec_output)
+        self.log_message(
+            f"┌{'─' * 6}┬{'─' * 45}┬{'─' * 55}┬{'─' * 6}┬{'─' * 13}┬{'─' * 10}┬{'─' * 12}┐",
+            self.rec_output
+        )
+        self.log_message(
+            f"│ {'Job':<4} │ {'Job Name':<43} │ {'Training Program':<53} │ {'Rank':<4} │ {'Similarity':<11} │ {'Score %':<8} │ {'Match':<10} │",
+            self.rec_output
+        )
+        self.log_message(
+            f"│ {'Idx':<4} │ {'':<43} │ {'':<53} │ {'':<4} │ {'Score':<11} │ {'':<8} │ {'Level':<10} │",
+            self.rec_output
+        )
+        self.log_message(
+            f"├{'─' * 6}┼{'─' * 45}┼{'─' * 55}┼{'─' * 6}┼{'─' * 13}┼{'─' * 10}┼{'─' * 12}┤",
+            self.rec_output
+        )
         
         # Process each job
         for job_idx in range(len(self.df_lowongan)):
@@ -1464,25 +2142,35 @@ class BBPVPMatchingGUI:
             if not filtered_indices:
                 continue
             
-            self.log_message(f"\n\n{'═' * 100}", self.rec_output)
-            self.log_message(f"🎯 JOB #{job_idx + 1}: {job_name}", self.rec_output)
-            self.log_message(f"{'═' * 100}", self.rec_output)
-            
             for rank, pel_idx in enumerate(filtered_indices, 1):
                 program_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
                 similarity = similarities[pel_idx]
                 
-                # Match level indicator
+                # Determine match level
                 if similarity >= 0.80:
-                    indicator = "🟢"
+                    match_level = "excellent"
+                    match_emoji = "🟢"
+                elif similarity >= 0.65:
+                    match_level = "very_good"
+                    match_emoji = "🟢"
                 elif similarity >= 0.50:
-                    indicator = "🟡"
+                    match_level = "good"
+                    match_emoji = "🟡"
+                elif similarity >= 0.35:
+                    match_level = "fair"
+                    match_emoji = "🟡"
                 else:
-                    indicator = "🔴"
+                    match_level = "weak"
+                    match_emoji = "🔴"
                 
-                self.log_message(f"\n   {indicator} {rank}. {program_name}", self.rec_output)
-                self.log_message(f"      Similarity: {similarity:.4f} ({similarity*100:.2f}%)", 
-                            self.rec_output)
+                # Truncate names if too long
+                job_display = job_name[:41] + ".." if len(job_name) > 43 else job_name
+                program_display = program_name[:51] + ".." if len(program_name) > 53 else program_name
+                
+                self.log_message(
+                    f"│ {job_idx:<4} │ {job_display:<43} │ {program_display:<53} │ {rank:<4} │ {similarity:<11.8f} │ {similarity*100:<8.2f} │ {match_emoji} {match_level:<8} │",
+                    self.rec_output
+                )
                 
                 # Store for export
                 self.all_recommendations.append({
@@ -1495,13 +2183,21 @@ class BBPVPMatchingGUI:
                     'Similarity_Percentage': similarity * 100
                 })
         
-        self.log_message(f"\n\n{'═' * 100}", self.rec_output)
+        # Table footer
+        self.log_message(
+            f"└{'─' * 6}┴{'─' * 45}┴{'─' * 55}┴{'─' * 6}┴{'─' * 13}┴{'─' * 10}┴{'─' * 12}┘",
+            self.rec_output
+        )
+                
+        self.save_recommendations()
+        self.complete_experiment()
+
+        self.log_message("\n" + "=" * 150, self.rec_output)
         self.log_message("✅ ALL RECOMMENDATIONS COMPLETE", self.rec_output)
-        self.log_message(f"{'═' * 100}", self.rec_output)
-        self.log_message(f"\nTotal recommendations generated: {len(self.all_recommendations)}", 
+        self.log_message("=" * 150, self.rec_output)
+        self.log_message(f"\nTotal: {len(self.all_recommendations)} recommendations | Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
                     self.rec_output)
-        self.log_message(f"\n💡 You can now export these recommendations using the export buttons above.", 
-                    self.rec_output)
+        self.log_message(f"💡 Export available via buttons above", self.rec_output)
 
     def export_recommendations_excel(self):
         """Export all recommendations to Excel"""
@@ -1620,15 +2316,233 @@ class BBPVPMatchingGUI:
         canvas.draw()
         canvas.get_tk_widget().pack(fill='both', expand=True)
 
+    def create_experiment(self, name, description=""):
+        """Create new experiment in database"""
+        if not self.db_connection or not self.db_connection.is_connected():
+            return None
+
+        try:
+            cursor = self.db_connection.cursor()
+            training_count = len(self.df_pelatihan) if self.df_pelatihan is not None else 0
+            job_count = len(self.df_lowongan) if self.df_lowongan is not None else 0
+
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            experiment_name = f"{name} ({timestamp})"
+
+            query = """
+            INSERT INTO experiments 
+            (experiment_name, description, dataset_training_count, dataset_job_count)
+            VALUES (%s, %s, %s, %s)
+            """
+
+            cursor.execute(query, (experiment_name, description, training_count, job_count))
+            self.db_connection.commit()
+
+            self.current_experiment_id = cursor.lastrowid
+            cursor.close()
+
+            print(f"✓ Experiment created: {experiment_name}")
+            return self.current_experiment_id
+
+        except Error as e:
+            print(f"✗ Error creating experiment: {e}")
+            return None
+
+    def save_preprocessing_sample(self, dataset_type, record_index, row):
+        """Save preprocessing sample to database"""
+        if not self.current_experiment_id or not self.db_connection:
+            return
+        
+        try:
+            cursor = self.db_connection.cursor()
+            
+            record_name = row['PROGRAM PELATIHAN'] if dataset_type == 'training' else row['Nama Jabatan']
+            
+            query = """
+            INSERT INTO preprocessing_samples 
+            (experiment_id, dataset_type, record_index, record_name, 
+            original_text, normalized_text, stopwords_removed, 
+            tokenized, stemmed_text, token_count)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            
+            token_count = int(row.get('token_count', 0)) if pd.notna(row.get('token_count', 0)) else 0
+            
+            values = (
+                self.current_experiment_id,
+                dataset_type,
+                int(record_index),
+                record_name,
+                row.get('text_features', ''),
+                row.get('normalized', ''),
+                row.get('no_stopwords', ''),
+                json.dumps(row.get('tokens', [])),
+                row.get('stemmed', ''),
+                token_count
+            )
+            
+            cursor.execute(query, values)
+            self.db_connection.commit()
+            cursor.close()
+        except Error as e:
+            print(f"✗ Error saving preprocessing sample: {e}")
+
+    def save_tfidf_calculation(self, pel_idx, low_idx):
+        """Save TF-IDF calculation to database"""
+        if not self.current_experiment_id or not self.db_connection:
+            return
+        
+        try:
+            cursor = self.db_connection.cursor()
+            
+            training_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
+            job_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan']
+            
+            query = """
+            INSERT INTO tfidf_calculations 
+            (experiment_id, training_index, training_name, job_index, job_name,
+            unique_terms_count, terms_json, tf_training_json, tf_job_json,
+            idf_json, tfidf_training_json, tfidf_job_json, cosine_similarity)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            
+            values = (
+                self.current_experiment_id,
+                int(pel_idx), 
+                training_name,
+                int(low_idx),
+                job_name,
+                int(len(self.current_all_terms)),
+                json.dumps(self.current_all_terms),
+                json.dumps(self.tf_d1),
+                json.dumps(self.tf_d2),
+                json.dumps(self.idf_dict),
+                json.dumps(self.tfidf_d1),
+                json.dumps(self.tfidf_d2),
+                float(self.current_similarity)
+            )         
+
+            cursor.execute(query, values)
+            self.db_connection.commit()
+            cursor.close()
+            print("✓ TF-IDF calculation saved to database")
+        except Error as e:
+            print(f"✗ Error saving TF-IDF: {e}")
+
+    def save_similarity_matrix(self):
+        """Save full similarity matrix to database"""
+        if not self.current_experiment_id or not self.db_connection:
+            return
+        
+        try:
+            cursor = self.db_connection.cursor()
+            
+            query = """
+            INSERT INTO similarity_matrix 
+            (experiment_id, training_index, training_name, job_index, job_name, similarity_score)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """
+            
+            batch_data = []
+            for job_idx in range(len(self.df_lowongan)):
+                job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan']
+                for pel_idx in range(len(self.df_pelatihan)):
+                    training_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
+                    similarity = float(self.similarity_matrix[pel_idx, job_idx])
+                    
+                batch_data.append((
+                    self.current_experiment_id,
+                    int(pel_idx),
+                    training_name,
+                    int(job_idx),
+                    job_name,
+                    float(similarity)
+                ))
+            
+            cursor.executemany(query, batch_data)
+            self.db_connection.commit()
+            cursor.close()
+            print(f"✓ Saved {len(batch_data)} similarity scores to database")
+        except Error as e:
+            print(f"✗ Error saving similarity matrix: {e}")
+
+    def save_recommendations(self):
+        """Save recommendations to database"""
+        if not self.current_experiment_id or not self.db_connection:
+            return
+        
+        try:
+            cursor = self.db_connection.cursor()
+            
+            query = """
+            INSERT INTO recommendations 
+            (experiment_id, job_index, job_name, training_index, training_name,
+            rank_position, similarity_score, similarity_percentage, match_level)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            
+            batch_data = []
+            for rec in self.all_recommendations:
+                # Determine match level
+                similarity = rec['Similarity_Score']
+                if similarity >= 0.80:
+                    match_level = 'excellent'
+                elif similarity >= 0.65:
+                    match_level = 'very_good'
+                elif similarity >= 0.50:
+                    match_level = 'good'
+                elif similarity >= 0.35:
+                    match_level = 'fair'
+                else:
+                    match_level = 'weak'
+                
+                batch_data.append((
+                    self.current_experiment_id,
+                    int(rec['Job_Index']),
+                    rec['Job_Name'],
+                    int(rec['Training_Index']),
+                    rec['Training_Program'],
+                    int(rec['Rank']),
+                    float(rec['Similarity_Score']),
+                    float(rec['Similarity_Percentage']),
+                    match_level
+                ))
+            
+            cursor.executemany(query, batch_data)
+            self.db_connection.commit()
+            cursor.close()
+            print(f"✓ Saved {len(batch_data)} recommendations to database")
+        except Error as e:
+            print(f"✗ Error saving recommendations: {e}")
+
+    def complete_experiment(self):
+        """Mark experiment as completed"""
+        if not self.current_experiment_id or not self.db_connection:
+            return
+        
+        try:
+            cursor = self.db_connection.cursor()
+            cursor.callproc('sp_complete_experiment', [self.current_experiment_id])
+            self.db_connection.commit()
+            cursor.close()
+            print("✓ Experiment marked as completed")
+        except Error as e:
+            print(f"✗ Error completing experiment: {e}")
+
 
 def main():
     root = tk.Tk()
-    
-    # Set style
     style = ttk.Style()
     style.theme_use('clam')
-    
     app = BBPVPMatchingGUI(root)
+    
+    def on_closing():
+        if app.db_connection and app.db_connection.is_connected():
+            app.db_connection.close()
+            print("✓ Database connection closed")
+        root.destroy()
+    
+    root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
 
 if __name__ == "__main__":

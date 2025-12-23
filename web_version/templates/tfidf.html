@@ -1,0 +1,919 @@
+{% extends "base.html" %}
+
+{% block title %}TF-IDF & Similarity - BBPVP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-calculator text-warning me-3"></i>
+        TF-IDF & Cosine Similarity
+    </h1>
+    <p class="page-subtitle">Calculate term frequency, document frequency, and similarity scores</p>
+</div>
+
+{% if not has_data %}
+<div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>Warning:</strong> Data not ready yet. 
+    Please complete data import and preprocessing first.
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <!-- Left Panel - Controls -->
+    <div class="col-lg-4">
+        <!-- Document Selection Card -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <i class="fas fa-file-alt me-2"></i>
+                Select Documents
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">
+                        <i class="fas fa-chalkboard-teacher text-primary me-1"></i>
+                        Training Program:
+                    </label>
+                    <select class="form-select" id="trainingSelect" {% if not has_data %}disabled{% endif %}>
+                        <option value="">-- Select Training Program --</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">
+                        <i class="fas fa-briefcase text-success me-1"></i>
+                        Job Position:
+                    </label>
+                    <select class="form-select" id="jobSelect" {% if not has_data %}disabled{% endif %}>
+                        <option value="">-- Select Job Position --</option>
+                    </select>
+                </div>
+                
+                <button class="btn btn-primary w-100" id="btnLoadDocuments" {% if not has_data %}disabled{% endif %}>
+                    <i class="fas fa-download me-2"></i>
+                    Load Document Options
+                </button>
+            </div>
+        </div>
+        
+        <!-- TF-IDF Steps Card -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <i class="fas fa-list-ol me-2"></i>
+                TF-IDF Calculation Steps
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" id="btnStep1" disabled>
+                        <i class="fas fa-tags me-2"></i>
+                        1. Show Tokens
+                    </button>
+                    <button class="btn btn-outline-primary" id="btnStep2" disabled>
+                        <i class="fas fa-hashtag me-2"></i>
+                        2. Calculate TF
+                    </button>
+                    <button class="btn btn-outline-primary" id="btnStep3" disabled>
+                        <i class="fas fa-file-alt me-2"></i>
+                        3. Calculate DF
+                    </button>
+                    <button class="btn btn-outline-primary" id="btnStep4" disabled>
+                        <i class="fas fa-chart-line me-2"></i>
+                        4. Calculate IDF
+                    </button>
+                    <button class="btn btn-outline-primary" id="btnStep5" disabled>
+                        <i class="fas fa-calculator me-2"></i>
+                        5. Calculate TF-IDF
+                    </button>
+                    <button class="btn btn-outline-primary" id="btnStep6" disabled>
+                        <i class="fas fa-equals me-2"></i>
+                        6. Calculate Similarity
+                    </button>
+                </div>
+                
+                <hr class="my-3">
+                
+                <button class="btn btn-success w-100" id="btnRunAllSteps" disabled>
+                    <i class="fas fa-play me-2"></i>
+                    Run All Steps
+                </button>
+            </div>
+        </div>
+        
+        <!-- Calculate All Button Card -->
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <i class="fas fa-rocket me-2"></i>
+                Full Calculation
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-3">
+                    <small>
+                        <i class="fas fa-info-circle me-1"></i>
+                        <strong>Note:</strong> This calculates similarity for ALL documents and is required before generating recommendations.
+                    </small>
+                </div>
+                
+                <button class="btn btn-warning w-100 btn-lg" id="btnCalculateAll" {% if not has_data %}disabled{% endif %}>
+                    <i class="fas fa-rocket me-2"></i>
+                    Calculate All Documents
+                </button>
+            </div>
+        </div>
+        
+        <!-- Formula Reference Card -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <i class="fas fa-graduation-cap me-2"></i>
+                Formula Reference
+            </div>
+            <div class="card-body">
+                <h6 class="mb-2">Term Frequency (TF):</h6>
+                <div class="alert alert-light text-center mb-3">
+                    <code>TF(t,d) = count(t,d) / |d|</code>
+                </div>
+                
+                <h6 class="mb-2">Inverse Document Frequency (IDF):</h6>
+                <div class="alert alert-light text-center mb-3">
+                    <code>IDF(t) = log(N / df(t))</code>
+                </div>
+                
+                <h6 class="mb-2">TF-IDF:</h6>
+                <div class="alert alert-light text-center mb-3">
+                    <code>TF-IDF = TF × IDF</code>
+                </div>
+                
+                <h6 class="mb-2">Cosine Similarity:</h6>
+                <div class="alert alert-light text-center">
+                    <code>cos(θ) = (A·B) / (||A|| × ||B||)</code>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Panel - Output -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>
+                    <i class="fas fa-chart-bar me-2"></i>
+                    <span id="outputTitle">TF-IDF Calculation Output</span>
+                </span>
+                <button class="btn btn-sm btn-outline-light" id="btnClearOutput" style="display: none;">
+                    <i class="fas fa-eraser me-1"></i>
+                    Clear
+                </button>
+            </div>
+            <div class="card-body" style="min-height: 600px; max-height: 800px; overflow-y: auto;">
+                <div id="calculationOutput">
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-calculator fa-3x mb-3 opacity-50"></i>
+                        <p class="mb-4">Select documents and click a step button to begin</p>
+                        
+                        <div class="alert alert-light text-start mx-auto" style="max-width: 600px;">
+                            <h6><i class="fas fa-lightbulb text-warning me-2"></i>How to use:</h6>
+                            <ol class="small mb-0">
+                                <li class="mb-2">Click "Load Document Options" to populate the dropdowns</li>
+                                <li class="mb-2">Select one training program and one job position</li>
+                                <li class="mb-2">Click step buttons (1-6) to see detailed calculations</li>
+                                <li class="mb-2">Or click "Run All Steps" to execute all at once</li>
+                                <li>Click "Calculate All Documents" when ready for full matrix</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Statistics Card (shown after Calculate All) -->
+        <div class="card mt-4" id="statsCard" style="display: none;">
+            <div class="card-header">
+                <i class="fas fa-chart-pie me-2"></i>
+                Similarity Statistics
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-primary mb-1" id="avgSimilarity">-</h4>
+                                <small class="text-muted">Average Similarity</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-success mb-1" id="maxSimilarity">-</h4>
+                                <small class="text-muted">Maximum Similarity</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-danger mb-1" id="minSimilarity">-</h4>
+                                <small class="text-muted">Minimum Similarity</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentStepData = {
+    trainingIdx: null,
+    jobIdx: null,
+    tokens1: null,
+    tokens2: null,
+    allTerms: null,
+    tfD1: null,
+    tfD2: null,
+    dfDict: null,
+    idfDict: null,
+    tfidfD1: null,
+    tfidfD2: null,
+    similarity: null
+};
+
+$(document).ready(function() {
+    // Load document options
+    $('#btnLoadDocuments').click(loadDocumentOptions);
+    
+    // Step buttons
+    $('#btnStep1').click(() => executeStep(1));
+    $('#btnStep2').click(() => executeStep(2));
+    $('#btnStep3').click(() => executeStep(3));
+    $('#btnStep4').click(() => executeStep(4));
+    $('#btnStep5').click(() => executeStep(5));
+    $('#btnStep6').click(() => executeStep(6));
+    
+    // Run all steps
+    $('#btnRunAllSteps').click(runAllSteps);
+    
+    // Calculate all documents
+    $('#btnCalculateAll').click(calculateAllDocuments);
+    
+    // Clear output
+    $('#btnClearOutput').click(clearOutput);
+    
+    // Enable step buttons when documents selected
+    $('#trainingSelect, #jobSelect').change(function() {
+        const bothSelected = $('#trainingSelect').val() && $('#jobSelect').val();
+        $('#btnStep1, #btnStep2, #btnStep3, #btnStep4, #btnStep5, #btnStep6, #btnRunAllSteps').prop('disabled', !bothSelected);
+    });
+});
+
+function loadDocumentOptions() {
+    $('#btnLoadDocuments').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Loading...');
+    
+    // Load training programs
+    $.ajax({
+        url: '/api/get-training-programs',
+        method: 'GET',
+        success: function(response) {
+            if (response.success) {
+                $('#trainingSelect').empty().append('<option value="">-- Select Training Program --</option>');
+                response.programs.forEach(prog => {
+                    $('#trainingSelect').append(`<option value="${prog.index}">${prog.index}: ${prog.name}</option>`);
+                });
+            }
+        }
+    });
+    
+    // Load job positions
+    $.ajax({
+        url: '/api/get-job-positions',
+        method: 'GET',
+        success: function(response) {
+            if (response.success) {
+                $('#jobSelect').empty().append('<option value="">-- Select Job Position --</option>');
+                response.jobs.forEach(job => {
+                    $('#jobSelect').append(`<option value="${job.index}">${job.index}: ${job.name}</option>`);
+                });
+                
+                showAlert('success', 'Document options loaded successfully!', '#calculationOutput');
+            }
+        },
+        complete: function() {
+            $('#btnLoadDocuments').prop('disabled', false).html('<i class="fas fa-download me-2"></i>Load Document Options');
+        }
+    });
+}
+
+function executeStep(step, appendMode = false) {
+    const trainingIdx = $('#trainingSelect').val();
+    const jobIdx = $('#jobSelect').val();
+    
+    if (!trainingIdx || !jobIdx) {
+        showAlert('warning', 'Please select both documents first!', '#calculationOutput');
+        return;
+    }
+    
+    currentStepData.trainingIdx = parseInt(trainingIdx);
+    currentStepData.jobIdx = parseInt(jobIdx);
+    
+    const stepNames = ['', 'Show Tokens', 'Calculate TF', 'Calculate DF', 'Calculate IDF', 'Calculate TF-IDF', 'Calculate Similarity'];
+    
+    if (!appendMode) {
+        $('#outputTitle').text(`Step ${step}: ${stepNames[step]}`);
+        $('#calculationOutput').html(showLoading(`Executing Step ${step}...`));
+    }
+    
+    $.ajax({
+        url: '/api/tfidf-step',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            step: step,
+            training_idx: trainingIdx,
+            job_idx: jobIdx,
+            step_data: currentStepData
+        }),
+        success: function(response) {
+            if (response.success) {
+                // Update step data
+                if (response.step_data) {
+                    Object.assign(currentStepData, response.step_data);
+                }
+                
+                // Display result
+                if (appendMode) {
+                    // Append mode: add to existing content with separator
+                    const currentContent = $('#calculationOutput').html();
+                    const newContent = displayStepResult(step, response, true);
+                    $('#calculationOutput').html(currentContent + '<hr class="my-4">' + newContent);
+                } else {
+                    // Normal mode: replace content
+                    displayStepResult(step, response);
+                }
+                
+                $('#btnClearOutput').show();
+            } else {
+                if (!appendMode) {
+                    showAlert('danger', response.message, '#calculationOutput');
+                }
+            }
+        },
+        error: function() {
+            if (!appendMode) {
+                showAlert('danger', 'Failed to execute step', '#calculationOutput');
+            }
+        }
+    });
+}
+
+function displayStepResult(step, response, returnOnly = false) {
+    let html = '';
+    
+    switch(step) {
+        case 1: // Show Tokens
+            html = `
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-tags me-2"></i>STEP 1: TOKENIZATION</h5>
+                </div>
+                
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">
+                        <i class="fas fa-chalkboard-teacher me-2"></i>
+                        Document 1 (Training): ${response.training_name}
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted mb-2">Original text (first 150 chars):</p>
+                        <div class="alert alert-light">${response.training_original.substring(0, 150)}...</div>
+                        
+                        <p class="small text-muted mb-2">Tokens:</p>
+                        <div class="alert alert-secondary">
+                            ${response.tokens1.join(', ')}
+                        </div>
+                        <p class="mb-0"><strong>Total tokens: ${response.tokens1.length}</strong></p>
+                    </div>
+                </div>
+                
+                <div class="card mb-3">
+                    <div class="card-header bg-success text-white">
+                        <i class="fas fa-briefcase me-2"></i>
+                        Document 2 (Job): ${response.job_name}
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted mb-2">Original text (first 150 chars):</p>
+                        <div class="alert alert-light">${response.job_original.substring(0, 150)}...</div>
+                        
+                        <p class="small text-muted mb-2">Tokens:</p>
+                        <div class="alert alert-secondary">
+                            ${response.tokens2.join(', ')}
+                        </div>
+                        <p class="mb-0"><strong>Total tokens: ${response.tokens2.length}</strong></p>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-chart-bar me-2"></i>
+                    <strong>Unique terms across both documents: ${response.all_terms.length}</strong>
+                </div>
+            `;
+            break;
+            
+        case 2: // Calculate TF
+            html = `
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-hashtag me-2"></i>STEP 2: TERM FREQUENCY (TF)</h5>
+                    <p class="mb-0 small">Formula: TF(t,d) = count of term t in document d / total terms in d</p>
+                </div>
+                
+                ${createTFTable('Training', response.training_name, response.tf_d1, response.tokens1_count)}
+                ${createTFTable('Job', response.job_name, response.tf_d2, response.tokens2_count)}
+            `;
+            break;
+            
+        case 3: // Calculate DF
+            html = `
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-file-alt me-2"></i>STEP 3: DOCUMENT FREQUENCY (DF)</h5>
+                    <p class="mb-0 small">DF(t) = Number of documents containing term t</p>
+                </div>
+                
+                ${createDFTable(response.df_dict, response.tf_d1, response.tf_d2)}
+            `;
+            break;
+            
+        case 4: // Calculate IDF
+            html = `
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-chart-line me-2"></i>STEP 4: INVERSE DOCUMENT FREQUENCY (IDF)</h5>
+                    <p class="mb-0 small">Formula: IDF(t) = log(N / DF(t)), where N = total documents = 2</p>
+                </div>
+                
+                ${createIDFTable(response.idf_dict, response.df_dict)}
+                
+                <div class="alert alert-light mt-3">
+                    <strong><i class="fas fa-lightbulb text-warning me-2"></i>Interpretation:</strong>
+                    <ul class="mb-0 small">
+                        <li>Higher IDF = term appears in fewer documents (more unique)</li>
+                        <li>Lower IDF = term appears in many documents (more common)</li>
+                    </ul>
+                </div>
+            `;
+            break;
+            
+        case 5: // Calculate TF-IDF
+            html = `
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-calculator me-2"></i>STEP 5: TF-IDF CALCULATION</h5>
+                    <p class="mb-0 small">Formula: TF-IDF(t,d) = TF(t,d) × IDF(t)</p>
+                </div>
+                
+                ${createTFIDFTable('Training', response.training_name, response.tfidf_d1, response.tf_d1, response.idf_dict)}
+                ${createTFIDFTable('Job', response.job_name, response.tfidf_d2, response.tf_d2, response.idf_dict)}
+            `;
+            break;
+            
+        case 6: // Calculate Similarity
+            html = `
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-equals me-2"></i>STEP 6: COSINE SIMILARITY</h5>
+                    <p class="mb-0 small">Formula: Cosine Similarity = (A · B) / (||A|| × ||B||)</p>
+                </div>
+                
+                ${createSimilarityCalculation(response)}
+                
+                <div class="alert ${getSimilarityClass(response.similarity)} mt-4">
+                    <h4 class="mb-2"><i class="fas fa-chart-line me-2"></i>FINAL RESULT</h4>
+                    <p class="mb-2"><strong>Cosine Similarity: ${response.similarity.toFixed(6)} (${(response.similarity * 100).toFixed(2)}%)</strong></p>
+                    <p class="mb-0"><strong>Interpretation: ${getSimilarityInterpretation(response.similarity)}</strong></p>
+                </div>
+                
+                <div class="alert alert-light mt-3">
+                    <strong><i class="fas fa-info-circle text-info me-2"></i>Similarity Scale:</strong>
+                    <ul class="mb-0 small">
+                        <li>1.00 = Identical documents</li>
+                        <li>0.80-1.00 = Very high similarity</li>
+                        <li>0.65-0.80 = High similarity</li>
+                        <li>0.50-0.65 = Medium similarity</li>
+                        <li>0.00-0.50 = Low similarity</li>
+                    </ul>
+                </div>
+            `;
+            break;
+    }
+    
+    if (returnOnly) {
+        return html;
+    } else {
+        $('#calculationOutput').html(html);
+    }
+}
+
+function createTFTable(docType, docName, tfDict, totalTokens) {
+    const terms = Object.keys(tfDict).slice(0, 15); // Show first 15
+    const remaining = Object.keys(tfDict).length - 15;
+    
+    let rows = '';
+    terms.forEach(term => {
+        const data = tfDict[term];
+        rows += `
+            <tr>
+                <td>${term}</td>
+                <td class="text-center">${data.count}</td>
+                <td class="text-end">${data.count}/${totalTokens} = ${data.tf.toFixed(4)}</td>
+            </tr>
+        `;
+    });
+    
+    return `
+        <div class="card mb-3">
+            <div class="card-header">
+                <strong>${docType} Document:</strong> ${docName}
+            </div>
+            <div class="card-body">
+                <p class="small mb-2">Total tokens: ${totalTokens}</p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>Term</th>
+                                <th class="text-center">Count</th>
+                                <th class="text-end">TF Calculation</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                            ${remaining > 0 ? `<tr><td colspan="3" class="text-center text-muted">... and ${remaining} more terms</td></tr>` : ''}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function createDFTable(dfDict, tfD1, tfD2) {
+    const terms = Object.keys(dfDict);
+    
+    let rows = '';
+    terms.forEach(term => {
+        const inD1 = tfD1[term].count > 0 ? '✓' : '✗';
+        const inD2 = tfD2[term].count > 0 ? '✓' : '✗';
+        rows += `
+            <tr>
+                <td>${term}</td>
+                <td class="text-center">${inD1}</td>
+                <td class="text-center">${inD2}</td>
+                <td class="text-center"><strong>${dfDict[term]}</strong></td>
+            </tr>
+        `;
+    });
+    
+    return `
+        <div class="table-responsive">
+            <table class="table table-sm table-striped">
+                <thead>
+                    <tr>
+                        <th>Term</th>
+                        <th class="text-center">In Training?</th>
+                        <th class="text-center">In Job?</th>
+                        <th class="text-center">DF</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function createIDFTable(idfDict, dfDict) {
+    const terms = Object.keys(idfDict);
+    
+    let rows = '';
+    terms.forEach(term => {
+        const df = dfDict[term];
+        const idf = idfDict[term];
+        const calc = df > 0 ? `log(2/${df})` : '0';
+        rows += `
+            <tr>
+                <td>${term}</td>
+                <td class="text-center">${df}</td>
+                <td class="text-center">${calc}</td>
+                <td class="text-end"><strong>${idf.toFixed(4)}</strong></td>
+            </tr>
+        `;
+    });
+    
+    return `
+        <div class="table-responsive">
+            <table class="table table-sm table-striped">
+                <thead>
+                    <tr>
+                        <th>Term</th>
+                        <th class="text-center">DF</th>
+                        <th class="text-center">IDF Calculation</th>
+                        <th class="text-end">IDF Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function createTFIDFTable(docType, docName, tfidfDict, tfDict, idfDict) {
+    const terms = Object.keys(tfidfDict).slice(0, 15);
+    const remaining = Object.keys(tfidfDict).length - 15;
+    
+    let rows = '';
+    terms.forEach(term => {
+        const tf = tfDict[term].tf;
+        const idf = idfDict[term];
+        const tfidf = tfidfDict[term];
+        rows += `
+            <tr>
+                <td>${term}</td>
+                <td class="text-end">${tf.toFixed(4)}</td>
+                <td class="text-end">${idf.toFixed(4)}</td>
+                <td class="text-end"><strong>${tfidf.toFixed(4)}</strong></td>
+            </tr>
+        `;
+    });
+    
+    return `
+        <div class="card mb-3">
+            <div class="card-header">
+                <strong>${docType} Document:</strong> ${docName}
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>Term</th>
+                                <th class="text-end">TF</th>
+                                <th class="text-end">IDF</th>
+                                <th class="text-end">TF-IDF</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                            ${remaining > 0 ? `<tr><td colspan="4" class="text-center text-muted">... and ${remaining} more terms</td></tr>` : ''}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function createSimilarityCalculation(response) {
+    return `
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6 class="mb-3">1️⃣ Dot Product (A · B):</h6>
+                <div class="alert alert-light">
+                    <code>A · B = ${response.dot_product.toFixed(6)}</code>
+                </div>
+                
+                <h6 class="mb-3 mt-4">2️⃣ Magnitude ||A|| (Training):</h6>
+                <div class="alert alert-light">
+                    <code>||A|| = ${response.mag_d1.toFixed(6)}</code>
+                </div>
+                
+                <h6 class="mb-3 mt-4">3️⃣ Magnitude ||B|| (Job):</h6>
+                <div class="alert alert-light">
+                    <code>||B|| = ${response.mag_d2.toFixed(6)}</code>
+                </div>
+                
+                <h6 class="mb-3 mt-4">4️⃣ Cosine Similarity:</h6>
+                <div class="alert alert-light">
+                    <code>Similarity = ${response.dot_product.toFixed(6)} / (${response.mag_d1.toFixed(6)} × ${response.mag_d2.toFixed(6)})</code><br>
+                    <code>Similarity = ${response.dot_product.toFixed(6)} / ${(response.mag_d1 * response.mag_d2).toFixed(6)}</code><br>
+                    <code>Similarity = <strong>${response.similarity.toFixed(6)}</strong></code>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function getSimilarityClass(similarity) {
+    if (similarity >= 0.80) return 'alert-success';
+    if (similarity >= 0.65) return 'alert-info';
+    if (similarity >= 0.50) return 'alert-warning';
+    return 'alert-secondary';
+}
+
+function getSimilarityInterpretation(similarity) {
+    if (similarity >= 0.80) return 'VERY HIGH - Excellent match!';
+    if (similarity >= 0.65) return 'HIGH - Good match';
+    if (similarity >= 0.50) return 'MEDIUM - Moderate match';
+    return 'LOW - Poor match';
+}
+
+function runAllSteps() {
+    // Clear output once at the start
+    $('#calculationOutput').html(showLoading('Running all steps...'));
+    $('#outputTitle').text('Running All TF-IDF Steps');
+    
+    // Execute steps sequentially with delays, appending results
+    setTimeout(() => {
+        executeStep(1, true); // true = append mode
+    }, 500);
+    
+    setTimeout(() => {
+        executeStep(2, true);
+    }, 1500);
+    
+    setTimeout(() => {
+        executeStep(3, true);
+    }, 2500);
+    
+    setTimeout(() => {
+        executeStep(4, true);
+    }, 3500);
+    
+    setTimeout(() => {
+        executeStep(5, true);
+    }, 4500);
+    
+    setTimeout(() => {
+        executeStep(6, true);
+    }, 5500);
+}
+
+function calculateAllDocuments() {
+    $('#btnCalculateAll').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Calculating...');
+    $('#outputTitle').text('Full Similarity Matrix Calculation');
+    
+    $('#calculationOutput').html(`
+        <div class="text-center py-5">
+            ${showLoading('Calculating TF-IDF and Cosine Similarity for ALL documents...')}
+            <p class="text-muted mt-3">This may take a moment depending on dataset size</p>
+            <div class="progress mt-4" style="height: 25px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%;">
+                    Processing...
+                </div>
+            </div>
+        </div>
+    `);
+    
+    $.ajax({
+        url: '/api/calculate-similarity',
+        method: 'POST',
+        contentType: 'application/json',
+        success: function(response) {
+            if (response.success) {
+                displayFullResults(response);
+                $('#btnClearOutput').show();
+            } else {
+                showAlert('danger', response.message, '#calculationOutput');
+            }
+        },
+        error: function() {
+            showAlert('danger', 'Failed to calculate similarity matrix', '#calculationOutput');
+        },
+        complete: function() {
+            $('#btnCalculateAll').prop('disabled', false).html('<i class="fas fa-rocket me-2"></i>Calculate All Documents');
+        }
+    });
+}
+
+function displayFullResults(response) {
+    const stats = response.stats;
+    
+    let html = `
+        <div class="alert alert-success">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-check-circle fa-2x me-3"></i>
+                <div>
+                    <h5 class="mb-1">✅ SIMILARITY CALCULATION COMPLETED</h5>
+                    <p class="mb-0">Full similarity matrix has been calculated for all document pairs.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h4 class="mb-1">${stats.total_calculations.toLocaleString()}</h4>
+                        <small>Total Calculations</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h4 class="mb-1">${(stats.avg * 100).toFixed(2)}%</h4>
+                        <small>Average Similarity</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h4 class="mb-1">${(stats.max * 100).toFixed(2)}%</h4>
+                        <small>Maximum</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-dark">
+                    <div class="card-body text-center">
+                        <h4 class="mb-1">${(stats.min * 100).toFixed(2)}%</h4>
+                        <small>Minimum</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="alert alert-info">
+            <i class="fas fa-arrow-right me-2"></i>
+            <strong>Next Step:</strong> Go to the <a href="/recommendations" class="alert-link">Recommendations</a> page to view matching results and generate recommendations!
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-2"></i>
+                Calculation Summary
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <tr>
+                            <th width="50%">Metric</th>
+                            <th>Value</th>
+                        </tr>
+                        <tr>
+                            <td><i class="fas fa-chart-line text-info me-2"></i>Average Similarity</td>
+                            <td><strong>${(stats.avg * 100).toFixed(4)}%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><i class="fas fa-arrow-up text-success me-2"></i>Maximum Similarity</td>
+                            <td><strong>${(stats.max * 100).toFixed(4)}%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><i class="fas fa-arrow-down text-danger me-2"></i>Minimum Similarity</td>
+                            <td><strong>${(stats.min * 100).toFixed(4)}%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><i class="fas fa-calculator text-warning me-2"></i>Total Calculations</td>
+                            <td><strong>${stats.total_calculations.toLocaleString()}</strong></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    $('#calculationOutput').html(html);
+    
+    // Update statistics card
+    $('#avgSimilarity').text((stats.avg * 100).toFixed(2) + '%');
+    $('#maxSimilarity').text((stats.max * 100).toFixed(2) + '%');
+    $('#minSimilarity').text((stats.min * 100).toFixed(2) + '%');
+    $('#statsCard').slideDown();
+}
+
+function clearOutput() {
+    $('#calculationOutput').html(`
+        <div class="text-center text-muted py-5">
+            <i class="fas fa-calculator fa-3x mb-3 opacity-50"></i>
+            <p>Output cleared. Select documents and click a step to begin.</p>
+        </div>
+    `);
+    $('#outputTitle').text('TF-IDF Calculation Output');
+    $('#btnClearOutput').hide();
+    $('#statsCard').hide();
+}
+
+// Utility functions from base.html
+function showLoading(message) {
+    return `
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted">${message}</p>
+        </div>
+    `;
+}
+
+function showAlert(type, message, target) {
+    const html = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    if (target) {
+        $(target).html(html);
+    }
+}
+</script>
+{% endblock %}
