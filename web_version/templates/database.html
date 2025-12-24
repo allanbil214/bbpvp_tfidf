@@ -25,7 +25,8 @@
                             <i class="fas fa-server me-2"></i>
                             Host
                         </label>
-                        <input type="text" class="form-control" id="dbHost" value="{{ db_config.host }}" placeholder="localhost">
+                        <input type="text" class="form-control" id="dbHost" 
+                               value="{{ db_config.host }}" placeholder="localhost">
                         <small class="text-muted">MySQL server hostname or IP address</small>
                     </div>
                     
@@ -34,7 +35,8 @@
                             <i class="fas fa-plug me-2"></i>
                             Port
                         </label>
-                        <input type="number" class="form-control" id="dbPort" value="{{ db_config.port }}" placeholder="3307">
+                        <input type="number" class="form-control" id="dbPort" 
+                               value="{{ db_config.port }}" placeholder="3307">
                         <small class="text-muted">MySQL server port (usually 3306 or 3307)</small>
                     </div>
                     
@@ -43,7 +45,8 @@
                             <i class="fas fa-database me-2"></i>
                             Database Name
                         </label>
-                        <input type="text" class="form-control" id="dbName" value="{{ db_config.database }}" placeholder="bbpvp_thesis">
+                        <input type="text" class="form-control" id="dbName" 
+                               value="{{ db_config.database }}" placeholder="bbpvp_thesis">
                         <small class="text-muted">Name of the database to use</small>
                     </div>
                     
@@ -52,7 +55,8 @@
                             <i class="fas fa-user me-2"></i>
                             Username
                         </label>
-                        <input type="text" class="form-control" id="dbUser" value="{{ db_config.user }}" placeholder="root">
+                        <input type="text" class="form-control" id="dbUser" 
+                               value="{{ db_config.user }}" placeholder="root">
                         <small class="text-muted">MySQL username</small>
                     </div>
                     
@@ -62,19 +66,13 @@
                             Password
                         </label>
                         <div class="input-group">
-                            <input type="password" class="form-control" id="dbPassword" value="{{ db_config.password }}" placeholder="Enter password">
+                            <input type="password" class="form-control" id="dbPassword" 
+                                   value="{{ db_config.password }}" placeholder="Enter password">
                             <button class="btn btn-outline-secondary" type="button" id="togglePassword">
                                 <i class="fas fa-eye"></i>
                             </button>
                         </div>
                         <small class="text-muted">MySQL password (leave empty if no password)</small>
-                    </div>
-                    
-                    <div class="form-check mb-4">
-                        <input class="form-check-input" type="checkbox" id="saveConfig">
-                        <label class="form-check-label" for="saveConfig">
-                            Save configuration for future sessions
-                        </label>
                     </div>
                     
                     <div class="d-grid gap-2">
@@ -91,57 +89,7 @@
             </div>
         </div>
         
-        <div class="card mt-4">
-            <div class="card-header">
-                <i class="fas fa-info-circle me-2"></i>
-                Setup Instructions
-            </div>
-            <div class="card-body">
-                <div class="alert alert-info mb-3">
-                    <i class="fas fa-lightbulb me-2"></i>
-                    <strong>Before you start:</strong> Make sure MySQL server is running!
-                </div>
-                
-                <h6 class="mb-3">Quick Setup Guide:</h6>
-                <ol class="mb-3">
-                    <li class="mb-2">Start your MySQL server (XAMPP, WAMP, or standalone)</li>
-                    <li class="mb-2">Import the <code>bbpvp.sql</code> file to create the database</li>
-                    <li class="mb-2">Enter your MySQL connection details above</li>
-                    <li class="mb-2">Click "Test Connection" to verify</li>
-                    <li class="mb-2">Click "Save Configuration" to apply settings</li>
-                </ol>
-                
-                <h6 class="mb-3">Default Settings:</h6>
-                <div class="table-responsive">
-                    <table class="table table-sm table-bordered">
-                        <tr>
-                            <th width="40%">Parameter</th>
-                            <th>Default Value</th>
-                        </tr>
-                        <tr>
-                            <td>Host</td>
-                            <td><code>localhost</code></td>
-                        </tr>
-                        <tr>
-                            <td>Port</td>
-                            <td><code>3307</code> or <code>3306</code></td>
-                        </tr>
-                        <tr>
-                            <td>Database</td>
-                            <td><code>bbpvp_thesis</code></td>
-                        </tr>
-                        <tr>
-                            <td>User</td>
-                            <td><code>root</code></td>
-                        </tr>
-                        <tr>
-                            <td>Password</td>
-                            <td>(empty)</td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
-        </div>
+        {% include 'partials/database_instructions.html' %}
     </div>
     
     <div class="col-lg-6">
@@ -167,7 +115,9 @@
                 Connection Logs
             </div>
             <div class="card-body">
-                <div id="connectionLogs" style="max-height: 400px; overflow-y: auto; background: #f8fafc; border-radius: 0.5rem; padding: 1rem; font-family: 'Courier New', monospace; font-size: 0.85rem;">
+                <div id="connectionLogs" style="max-height: 400px; overflow-y: auto; 
+                     background: #f8fafc; border-radius: 0.5rem; padding: 1rem; 
+                     font-family: 'Courier New', monospace; font-size: 0.85rem;">
                     <div class="text-muted">
                         <i class="fas fa-info-circle me-2"></i>
                         Connection logs will appear here...
@@ -176,228 +126,11 @@
             </div>
         </div>
         
-        <div class="card mt-4">
-            <div class="card-header">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                Troubleshooting
-            </div>
-            <div class="card-body">
-                <div class="accordion" id="troubleshootingAccordion">
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#trouble1">
-                                Can't connect to MySQL server
-                            </button>
-                        </h2>
-                        <div id="trouble1" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
-                            <div class="accordion-body">
-                                <strong>Solutions:</strong>
-                                <ul>
-                                    <li>Check if MySQL service is running</li>
-                                    <li>Verify the port number (3306 or 3307)</li>
-                                    <li>Check firewall settings</li>
-                                    <li>Try using 127.0.0.1 instead of localhost</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#trouble2">
-                                Access denied for user
-                            </button>
-                        </h2>
-                        <div id="trouble2" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
-                            <div class="accordion-body">
-                                <strong>Solutions:</strong>
-                                <ul>
-                                    <li>Check username and password are correct</li>
-                                    <li>Verify user has access to the database</li>
-                                    <li>Try creating a new MySQL user</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#trouble3">
-                                Unknown database 'bbpvp_thesis'
-                            </button>
-                        </h2>
-                        <div id="trouble3" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
-                            <div class="accordion-body">
-                                <strong>Solutions:</strong>
-                                <ul>
-                                    <li>Import the bbpvp.sql file first</li>
-                                    <li>Create the database manually: <code>CREATE DATABASE bbpvp_thesis;</code></li>
-                                    <li>Check database name spelling</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {% include 'partials/database_troubleshooting.html' %}
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script>
-$(document).ready(function() {
-    // Toggle password visibility
-    $('#togglePassword').click(function() {
-        const passwordInput = $('#dbPassword');
-        const icon = $(this).find('i');
-        
-        if (passwordInput.attr('type') === 'password') {
-            passwordInput.attr('type', 'text');
-            icon.removeClass('fa-eye').addClass('fa-eye-slash');
-        } else {
-            passwordInput.attr('type', 'password');
-            icon.removeClass('fa-eye-slash').addClass('fa-eye');
-        }
-    });
-    
-    // Test connection
-    $('#btnTestConnection').click(function() {
-        testConnection();
-    });
-    
-    // Save configuration
-    $('#btnSaveConfig').click(function() {
-        saveConfiguration();
-    });
-});
-
-function addLog(message, type = 'info') {
-    const timestamp = new Date().toLocaleTimeString();
-    const icons = {
-        'info': 'fa-info-circle text-info',
-        'success': 'fa-check-circle text-success',
-        'error': 'fa-times-circle text-danger',
-        'warning': 'fa-exclamation-triangle text-warning'
-    };
-    
-    const log = `
-        <div class="mb-2">
-            <span class="text-muted">[${timestamp}]</span>
-            <i class="fas ${icons[type]} me-2"></i>
-            ${message}
-        </div>
-    `;
-    
-    $('#connectionLogs').append(log);
-    $('#connectionLogs').scrollTop($('#connectionLogs')[0].scrollHeight);
-}
-
-function testConnection() {
-    const btn = $('#btnTestConnection');
-    btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Testing...');
-    
-    $('#statusBadge').removeClass('bg-success bg-danger bg-secondary').addClass('bg-warning').text('Testing...');
-    $('#statusDisplay').html(showLoading('Testing database connection...'));
-    
-    addLog('Starting connection test...', 'info');
-    addLog(`Host: ${$('#dbHost').val()}`, 'info');
-    addLog(`Port: ${$('#dbPort').val()}`, 'info');
-    addLog(`Database: ${$('#dbName').val()}`, 'info');
-    addLog(`User: ${$('#dbUser').val()}`, 'info');
-    
-    $.ajax({
-        url: '/api/test-connection',
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({
-            host: $('#dbHost').val(),
-            port: parseInt($('#dbPort').val()),
-            database: $('#dbName').val(),
-            user: $('#dbUser').val(),
-            password: $('#dbPassword').val()
-        }),
-        success: function(response) {
-            if (response.success) {
-                $('#statusBadge').removeClass('bg-warning bg-danger bg-secondary').addClass('bg-success').text('Connected');
-                $('#statusDisplay').html(`
-                    <div class="text-center py-4">
-                        <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
-                        <h5 class="text-success mb-3">Connection Successful!</h5>
-                        <div class="alert alert-success text-start">
-                            <strong><i class="fas fa-server me-2"></i>Connection Details:</strong>
-                            <hr>
-                            <div class="row">
-                                <div class="col-6"><strong>Host:</strong></div>
-                                <div class="col-6">${$('#dbHost').val()}</div>
-                                <div class="col-6"><strong>Port:</strong></div>
-                                <div class="col-6">${$('#dbPort').val()}</div>
-                                <div class="col-6"><strong>Database:</strong></div>
-                                <div class="col-6">${$('#dbName').val()}</div>
-                                <div class="col-6"><strong>User:</strong></div>
-                                <div class="col-6">${$('#dbUser').val()}</div>
-                                <div class="col-6"><strong>Status:</strong></div>
-                                <div class="col-6"><span class="badge bg-success">Active</span></div>
-                            </div>
-                        </div>
-                        <p class="text-muted">${response.message}</p>
-                    </div>
-                `);
-                addLog('✓ Connection successful!', 'success');
-                addLog(response.message, 'success');
-            } else {
-                $('#statusBadge').removeClass('bg-warning bg-success bg-secondary').addClass('bg-danger').text('Failed');
-                $('#statusDisplay').html(`
-                    <div class="text-center py-4">
-                        <i class="fas fa-times-circle fa-4x text-danger mb-3"></i>
-                        <h5 class="text-danger mb-3">Connection Failed</h5>
-                        <div class="alert alert-danger text-start">
-                            <strong><i class="fas fa-exclamation-triangle me-2"></i>Error:</strong>
-                            <hr>
-                            <p class="mb-0">${response.message}</p>
-                        </div>
-                        <p class="text-muted">Please check your settings and try again</p>
-                    </div>
-                `);
-                addLog('✗ Connection failed!', 'error');
-                addLog(response.message, 'error');
-            }
-        },
-        error: function(xhr) {
-            $('#statusBadge').removeClass('bg-warning bg-success bg-secondary').addClass('bg-danger').text('Error');
-            $('#statusDisplay').html(`
-                <div class="text-center py-4">
-                    <i class="fas fa-exclamation-circle fa-4x text-danger mb-3"></i>
-                    <h5 class="text-danger">Error Testing Connection</h5>
-                    <p class="text-muted">An unexpected error occurred</p>
-                </div>
-            `);
-            addLog('✗ Unexpected error occurred', 'error');
-        },
-        complete: function() {
-            btn.prop('disabled', false).html('<i class="fas fa-plug me-2"></i>Test Connection');
-        }
-    });
-}
-
-function saveConfiguration() {
-    const config = {
-        host: $('#dbHost').val(),
-        port: parseInt($('#dbPort').val()),
-        database: $('#dbName').val(),
-        user: $('#dbUser').val(),
-        password: $('#dbPassword').val()
-    };
-    
-    // In a real application, this would save to backend
-    addLog('Configuration saved locally', 'success');
-    
-    const alert = showAlert('success', 'Configuration saved successfully! <br><small>Note: Configuration is saved for this session only.</small>');
-    $('#dbConfigForm').prepend(alert);
-    
-    setTimeout(() => {
-        $('.alert').fadeOut();
-    }, 3000);
-}
-</script>
+<script src="{{ url_for('static', filename='js/database.js') }}"></script>
 {% endblock %}

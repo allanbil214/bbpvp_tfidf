@@ -12,7 +12,7 @@
 </div>
 
 <div class="row g-4">
-    <!-- Left Panel - Settings Form -->
+    <!-- Left Panel: Settings Form -->
     <div class="col-lg-6">
         <div class="card">
             <div class="card-header">
@@ -23,7 +23,6 @@
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
                     <strong>Note:</strong> These thresholds determine how similarity scores are classified.
-                    Values must be between 0 and 1, and in descending order.
                 </div>
                 
                 <form id="settingsForm">
@@ -35,9 +34,12 @@
                         </label>
                         <div class="input-group">
                             <span class="input-group-text">≥</span>
-                            <input type="number" class="form-control" id="excellentThreshold" 
-                                   step="0.01" min="0" max="1" value="{{ thresholds.excellent }}" required>
-                            <span class="input-group-text" id="excellentPercent">80%</span>
+                            <input type="number" class="form-control threshold-input" 
+                                   id="excellentThreshold" name="excellent"
+                                   step="0.01" min="0" max="1" 
+                                   value="{{ thresholds.excellent }}" required>
+                            <span class="input-group-text threshold-percent" 
+                                  data-target="excellentThreshold">80%</span>
                         </div>
                         <small class="text-muted">Similarity score must be at least this value</small>
                     </div>
@@ -50,9 +52,12 @@
                         </label>
                         <div class="input-group">
                             <span class="input-group-text">≥</span>
-                            <input type="number" class="form-control" id="veryGoodThreshold" 
-                                   step="0.01" min="0" max="1" value="{{ thresholds.very_good }}" required>
-                            <span class="input-group-text" id="veryGoodPercent">65%</span>
+                            <input type="number" class="form-control threshold-input" 
+                                   id="veryGoodThreshold" name="very_good"
+                                   step="0.01" min="0" max="1" 
+                                   value="{{ thresholds.very_good }}" required>
+                            <span class="input-group-text threshold-percent" 
+                                  data-target="veryGoodThreshold">65%</span>
                         </div>
                         <small class="text-muted">Between this and Excellent threshold</small>
                     </div>
@@ -65,9 +70,12 @@
                         </label>
                         <div class="input-group">
                             <span class="input-group-text">≥</span>
-                            <input type="number" class="form-control" id="goodThreshold" 
-                                   step="0.01" min="0" max="1" value="{{ thresholds.good }}" required>
-                            <span class="input-group-text" id="goodPercent">50%</span>
+                            <input type="number" class="form-control threshold-input" 
+                                   id="goodThreshold" name="good"
+                                   step="0.01" min="0" max="1" 
+                                   value="{{ thresholds.good }}" required>
+                            <span class="input-group-text threshold-percent" 
+                                  data-target="goodThreshold">50%</span>
                         </div>
                         <small class="text-muted">Between this and Very Good threshold</small>
                     </div>
@@ -80,14 +88,17 @@
                         </label>
                         <div class="input-group">
                             <span class="input-group-text">≥</span>
-                            <input type="number" class="form-control" id="fairThreshold" 
-                                   step="0.01" min="0" max="1" value="{{ thresholds.fair }}" required>
-                            <span class="input-group-text" id="fairPercent">35%</span>
+                            <input type="number" class="form-control threshold-input" 
+                                   id="fairThreshold" name="fair"
+                                   step="0.01" min="0" max="1" 
+                                   value="{{ thresholds.fair }}" required>
+                            <span class="input-group-text threshold-percent" 
+                                  data-target="fairThreshold">35%</span>
                         </div>
                         <small class="text-muted">Between this and Good threshold</small>
                     </div>
                     
-                    <!-- Weak (automatic) -->
+                    <!-- Weak (info only) -->
                     <div class="mb-4">
                         <label class="form-label">
                             <span class="badge bg-danger me-2">🔴 Weak</span>
@@ -117,7 +128,7 @@
         </div>
     </div>
     
-    <!-- Right Panel - Preview & Info -->
+    <!-- Right Panel: Preview & Info -->
     <div class="col-lg-6">
         <!-- Current Settings Preview -->
         <div class="card mb-4">
@@ -127,7 +138,7 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-bordered">
+                    <table class="table table-bordered" id="previewTable">
                         <thead>
                             <tr>
                                 <th>Level</th>
@@ -135,8 +146,8 @@
                                 <th>Indicator</th>
                             </tr>
                         </thead>
-                        <tbody id="previewTable">
-                            <!-- Will be populated by JavaScript -->
+                        <tbody>
+                            <!-- Populated by JavaScript -->
                         </tbody>
                     </table>
                 </div>
@@ -150,8 +161,9 @@
                 Visual Scale
             </div>
             <div class="card-body">
-                <div id="visualScale" style="height: 60px; position: relative; background: linear-gradient(to right, #dc3545, #ffc107, #28a745); border-radius: 5px;">
-                    <!-- Markers will be added by JavaScript -->
+                <div id="visualScale" class="position-relative" 
+                     style="height: 60px; background: linear-gradient(to right, #dc3545, #ffc107, #28a745); border-radius: 5px;">
+                    <!-- Markers added by JavaScript -->
                 </div>
                 <div class="d-flex justify-content-between mt-2">
                     <small>0%</small>
@@ -195,168 +207,13 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
-    // Update percentage displays when values change
-    function updatePercentages() {
-        $('#excellentPercent').text(($('#excellentThreshold').val() * 100).toFixed(0) + '%');
-        $('#veryGoodPercent').text(($('#veryGoodThreshold').val() * 100).toFixed(0) + '%');
-        $('#goodPercent').text(($('#goodThreshold').val() * 100).toFixed(0) + '%');
-        $('#fairPercent').text(($('#fairThreshold').val() * 100).toFixed(0) + '%');
-        
-        updatePreview();
-        updateVisualScale();
-    }
-    
-    // Update preview table
-    function updatePreview() {
-        const excellent = parseFloat($('#excellentThreshold').val());
-        const veryGood = parseFloat($('#veryGoodThreshold').val());
-        const good = parseFloat($('#goodThreshold').val());
-        const fair = parseFloat($('#fairThreshold').val());
-        
-        const html = `
-            <tr class="table-success">
-                <td><strong>🟢 Excellent</strong></td>
-                <td><strong>≥ ${(excellent * 100).toFixed(0)}%</strong></td>
-                <td><span class="badge bg-success">Top Tier</span></td>
-            </tr>
-            <tr class="table-success">
-                <td><strong>🟢 Very Good</strong></td>
-                <td><strong>${(veryGood * 100).toFixed(0)}% - ${(excellent * 100 - 0.01).toFixed(0)}%</strong></td>
-                <td><span class="badge bg-success">High Quality</span></td>
-            </tr>
-            <tr class="table-warning">
-                <td><strong>🟡 Good</strong></td>
-                <td><strong>${(good * 100).toFixed(0)}% - ${(veryGood * 100 - 0.01).toFixed(0)}%</strong></td>
-                <td><span class="badge bg-warning text-dark">Acceptable</span></td>
-            </tr>
-            <tr class="table-warning">
-                <td><strong>🟡 Fair</strong></td>
-                <td><strong>${(fair * 100).toFixed(0)}% - ${(good * 100 - 0.01).toFixed(0)}%</strong></td>
-                <td><span class="badge bg-warning text-dark">Marginal</span></td>
-            </tr>
-            <tr class="table-danger">
-                <td><strong>🔴 Weak</strong></td>
-                <td><strong>&lt; ${(fair * 100).toFixed(0)}%</strong></td>
-                <td><span class="badge bg-danger">Poor Match</span></td>
-            </tr>
-        `;
-        
-        $('#previewTable').html(html);
-    }
-    
-    // Update visual scale
-    function updateVisualScale() {
-        const excellent = parseFloat($('#excellentThreshold').val());
-        const veryGood = parseFloat($('#veryGoodThreshold').val());
-        const good = parseFloat($('#goodThreshold').val());
-        const fair = parseFloat($('#fairThreshold').val());
-        
-        const scale = $('#visualScale');
-        scale.find('.threshold-marker').remove();
-        
-        // Add markers
-        [
-            { value: fair, label: 'Fair', color: '#ffc107' },
-            { value: good, label: 'Good', color: '#ffc107' },
-            { value: veryGood, label: 'V.Good', color: '#28a745' },
-            { value: excellent, label: 'Excellent', color: '#28a745' }
-        ].forEach(marker => {
-            const left = (marker.value * 100) + '%';
-            scale.append(`
-                <div class="threshold-marker" style="position: absolute; left: ${left}; top: 0; bottom: 0; width: 2px; background: white; box-shadow: 0 0 4px rgba(0,0,0,0.5);">
-                    <div style="position: absolute; top: -20px; left: -20px; font-size: 10px; font-weight: bold; color: ${marker.color}; background: white; padding: 2px 4px; border-radius: 3px; white-space: nowrap;">
-                        ${marker.label}
-                    </div>
-                </div>
-            `);
-        });
-    }
-    
-    // Attach event listeners
-    $('#excellentThreshold, #veryGoodThreshold, #goodThreshold, #fairThreshold').on('input', updatePercentages);
-    
-    // Initialize
-    updatePercentages();
-    
-    // Form submission
-    $('#settingsForm').submit(function(e) {
-        e.preventDefault();
-        
-        const thresholds = {
-            excellent: parseFloat($('#excellentThreshold').val()),
-            very_good: parseFloat($('#veryGoodThreshold').val()),
-            good: parseFloat($('#goodThreshold').val()),
-            fair: parseFloat($('#fairThreshold').val())
-        };
-        
-        // Client-side validation
-        if (thresholds.excellent <= thresholds.very_good ||
-            thresholds.very_good <= thresholds.good ||
-            thresholds.good <= thresholds.fair ||
-            thresholds.fair < 0) {
-            showAlert('danger', 'Thresholds must be in descending order: Excellent > Very Good > Good > Fair ≥ 0');
-            return;
-        }
-        
-        // Save to server
-        $.ajax({
-            url: '/api/save-settings',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ thresholds: thresholds }),
-            success: function(response) {
-                if (response.success) {
-                    showAlert('success', '✓ Settings saved successfully! New calculations will use these thresholds.');
-                } else {
-                    showAlert('danger', response.message);
-                }
-            },
-            error: function() {
-                showAlert('danger', 'Failed to save settings');
-            }
-        });
-    });
-    
-    // Reset button
-    $('#btnReset').click(function() {
-        if (confirm('Reset all thresholds to default values?')) {
-            $.ajax({
-                url: '/api/reset-settings',
-                method: 'POST',
-                success: function(response) {
-                    if (response.success) {
-                        $('#excellentThreshold').val(response.thresholds.excellent);
-                        $('#veryGoodThreshold').val(response.thresholds.very_good);
-                        $('#goodThreshold').val(response.thresholds.good);
-                        $('#fairThreshold').val(response.thresholds.fair);
-                        updatePercentages();
-                        showAlert('success', '✓ Settings reset to defaults');
-                    } else {
-                        showAlert('danger', response.message);
-                    }
-                },
-                error: function() {
-                    showAlert('danger', 'Failed to reset settings');
-                }
-            });
-        }
-    });
-    
-    function showAlert(type, message) {
-        const html = `
-            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        `;
-        $('#statusMessage').html(html);
-        
-        // Auto dismiss after 5 seconds
-        setTimeout(() => {
-            $('#statusMessage .alert').fadeOut();
-        }, 5000);
-    }
-});
+// Pass Flask data to JavaScript
+const INITIAL_THRESHOLDS = {
+    excellent: {{ thresholds.excellent }},
+    very_good: {{ thresholds.very_good }},
+    good: {{ thresholds.good }},
+    fair: {{ thresholds.fair }}
+};
 </script>
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
 {% endblock %}

@@ -15,11 +15,12 @@
 <div class="alert alert-warning">
     <i class="fas fa-exclamation-triangle me-2"></i>
     <strong>Warning:</strong> Similarity matrix not calculated yet. 
-    Please go to <a href="/tfidf" class="alert-link">TF-IDF page</a> and calculate similarity first.
+    Please go to <a href="{{ url_for('tfidf.tfidf_page') }}" class="alert-link">TF-IDF page</a> and calculate similarity first.
 </div>
 {% endif %}
 
 <div class="row g-4">
+    <!-- Left Panel: Configuration -->
     <div class="col-lg-4">
         <div class="card">
             <div class="card-header">
@@ -53,7 +54,8 @@
                         <i class="fas fa-list-ol me-2"></i>
                         Top N Recommendations
                     </label>
-                    <input type="number" class="form-control" id="topN" value="3" min="1" max="10" {% if not has_similarity %}disabled{% endif %}>
+                    <input type="number" class="form-control" id="topN" value="3" min="1" max="10" 
+                           {% if not has_similarity %}disabled{% endif %}>
                     <small class="text-muted">Number of recommendations per job</small>
                 </div>
                 
@@ -62,7 +64,8 @@
                         <i class="fas fa-filter me-2"></i>
                         Minimum Similarity Threshold
                     </label>
-                    <input type="range" class="form-range" id="threshold" min="0" max="100" value="1" step="1" {% if not has_similarity %}disabled{% endif %}>
+                    <input type="range" class="form-range" id="threshold" min="0" max="100" value="1" step="1" 
+                           {% if not has_similarity %}disabled{% endif %}>
                     <div class="d-flex justify-content-between">
                         <small class="text-muted">0%</small>
                         <small class="fw-bold text-primary" id="thresholdValue">1%</small>
@@ -70,7 +73,8 @@
                     </div>
                 </div>
                 
-                <button class="btn btn-primary w-100 mb-2" id="btnGetRecommendations" {% if not has_similarity %}disabled{% endif %}>
+                <button class="btn btn-primary w-100 mb-2" id="btnGetRecommendations" 
+                        {% if not has_similarity %}disabled{% endif %}>
                     <i class="fas fa-magic me-2"></i>
                     Get Recommendations
                 </button>
@@ -95,11 +99,15 @@
                 Match Levels
             </div>
             <div class="card-body" id="matchLevelsBody">
-                <!-- Will be populated by JavaScript -->
+                <div class="text-center text-muted py-3">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p class="small mb-0 mt-2">Loading match levels...</p>
+                </div>
             </div>
         </div>
     </div>
     
+    <!-- Right Panel: Results -->
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -121,287 +129,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-let currentRecommendations = [];
-let jobPositions = []; // Store job positions
-
-$(document).ready(function() {
-    loadMatchLevels();
-
-    // Load job positions on page load
-    {% if has_similarity %}
-    loadJobPositions();
-    {% endif %}
-
-    // Update threshold display
-    $('#threshold').on('input', function() {
-        $('#thresholdValue').text($(this).val() + '%');
-    });
-    
-    // Toggle single job config
-    $('#recMode').change(function() {
-        if ($(this).val() === 'single') {
-            $('#singleJobConfig').slideDown();
-            // Load job positions if not loaded
-            if (jobPositions.length === 0) {
-                loadJobPositions();
-            }
-        } else {
-            $('#singleJobConfig').slideUp();
-        }
-    });
-    
-    // Get recommendations
-    $('#btnGetRecommendations').click(function() {
-        getRecommendations();
-    });
-    
-    // Export buttons
-    $('#btnExportExcel').click(function() {
-        exportRecommendations('excel');
-    });
-    
-    $('#btnExportCSV').click(function() {
-        exportRecommendations('csv');
-    });
-});
-
-function loadJobPositions() {
-    console.log('Loading job positions...');
-    
-    // Show loading state
-    $('#jobSelect').html('<option value="">Loading job positions...</option>').prop('disabled', true);
-    
-    $.ajax({
-        url: '/api/get-job-positions',
-        method: 'GET',
-        success: function(response) {
-            console.log('Job positions response:', response);
-            
-            if (response.success && response.jobs) {
-                jobPositions = response.jobs;
-                
-                // Populate select dropdown
-                let options = '<option value="">-- Select a job position --</option>';
-                response.jobs.forEach((job, index) => {
-                    options += `<option value="${index}">${job.name}</option>`;
-                });
-                
-                $('#jobSelect').html(options).prop('disabled', false);
-                console.log(`✓ Loaded ${response.jobs.length} job positions`);
-            } else {
-                $('#jobSelect').html('<option value="">No job positions available</option>');
-                console.error('Failed to load job positions:', response.message);
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('Error loading job positions:', error);
-            $('#jobSelect').html('<option value="">Error loading jobs</option>');
-            
-            // Show error alert
-            const alert = showAlert('danger', 'Failed to load job positions. Please refresh the page.');
-            $('#singleJobConfig').append(alert);
-        }
-    });
-}
-
-function loadMatchLevels() {
-    $.ajax({
-        url: '/api/get-settings',
-        method: 'GET',
-        success: function(response) {
-            if (response.success) {
-                const t = response.thresholds;
-                
-                const html = `
-                    <div class="mb-2">
-                        <span class="badge match-excellent me-2">Excellent</span>
-                        <span class="small">≥ ${(t.excellent * 100).toFixed(0)}%</span>
-                    </div>
-                    <div class="mb-2">
-                        <span class="badge match-very-good me-2">Very Good</span>
-                        <span class="small">${(t.very_good * 100).toFixed(0)}% - ${(t.excellent * 100 - 0.01).toFixed(0)}%</span>
-                    </div>
-                    <div class="mb-2">
-                        <span class="badge match-good me-2">Good</span>
-                        <span class="small">${(t.good * 100).toFixed(0)}% - ${(t.very_good * 100 - 0.01).toFixed(0)}%</span>
-                    </div>
-                    <div class="mb-2">
-                        <span class="badge match-fair me-2">Fair</span>
-                        <span class="small">${(t.fair * 100).toFixed(0)}% - ${(t.good * 100 - 0.01).toFixed(0)}%</span>
-                    </div>
-                    <div>
-                        <span class="badge match-weak me-2">Weak</span>
-                        <span class="small">&lt; ${(t.fair * 100).toFixed(0)}%</span>
-                    </div>
-                    <hr class="my-3">
-                    <div class="text-center">
-                        <a href="/settings" class="btn btn-sm btn-outline-primary">
-                            <i class="fas fa-cog me-1"></i>
-                            Customize Thresholds
-                        </a>
-                    </div>
-                `;
-                
-                $('#matchLevelsBody').html(html);
-                
-                // Store thresholds globally for use in displayRecommendations
-                window.matchThresholds = t;
-            }
-        },
-        error: function() {
-            console.error('Failed to load match levels');
-        }
-    });
-}
-
-function getRecommendations() {
-    const mode = $('#recMode').val();
-    const topN = parseInt($('#topN').val());
-    const threshold = parseFloat($('#threshold').val()) / 100;
-    const jobIdx = mode === 'single' ? $('#jobSelect').val() : null;
-    
-    // Validation for single job mode
-    if (mode === 'single' && (!jobIdx || jobIdx === '')) {
-        const alert = showAlert('warning', 'Please select a job position first!');
-        $('#resultsContainer').html(alert);
-        return;
-    }
-    
-    $('#resultsContainer').html(showLoading('Generating recommendations...'));
-    $('#btnGetRecommendations').prop('disabled', true);
-    
-    // Build request data
-    const requestData = {
-        top_n: topN,
-        threshold: threshold
-    };
-    
-    // Only add job_idx if it's valid
-    if (mode === 'single' && jobIdx) {
-        requestData.job_idx = parseInt(jobIdx);
-    }
-    
-    console.log('Requesting recommendations with:', requestData);
-    
-    $.ajax({
-        url: '/api/get-recommendations',
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify(requestData),
-        success: function(response) {
-            console.log('Recommendations response:', response);
-            
-            if (response.success) {
-                currentRecommendations = response.recommendations;
-                displayRecommendations(response.recommendations);
-                $('#btnExportExcel, #btnExportCSV').prop('disabled', false);
-            } else {
-                $('#resultsContainer').html(showAlert('danger', response.message));
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('Error getting recommendations:', error);
-            $('#resultsContainer').html(showAlert('danger', 'Failed to get recommendations: ' + error));
-        },
-        complete: function() {
-            $('#btnGetRecommendations').prop('disabled', false);
-        }
-    });
-}
-
-function displayRecommendations(recommendations) {
-    if (recommendations.length === 0) {
-        $('#resultsContainer').html(showAlert('info', 'No recommendations found with current settings. Try lowering the threshold or increasing Top N.'));
-        $('#resultCount').text('0 results');
-        return;
-    }
-    
-    $('#resultCount').text(`${recommendations.length} results`);
-    
-    let html = '<div class="table-responsive"><table class="table table-hover" id="recTable">';
-    html += '<thead><tr>';
-    html += '<th>Rank</th>';
-    html += '<th>Job Position</th>';
-    html += '<th>Training Program</th>';
-    html += '<th>Similarity</th>';
-    html += '<th>Match</th>';
-    html += '</tr></thead><tbody>';
-    
-    recommendations.forEach(rec => {
-        const score = rec.Similarity_Score;
-        let matchClass, matchLabel;
-        
-        if (score >= 0.80) {
-            matchClass = 'match-excellent';
-            matchLabel = 'Excellent';
-        } else if (score >= 0.65) {
-            matchClass = 'match-very-good';
-            matchLabel = 'Very Good';
-        } else if (score >= 0.50) {
-            matchClass = 'match-good';
-            matchLabel = 'Good';
-        } else if (score >= 0.35) {
-            matchClass = 'match-fair';
-            matchLabel = 'Fair';
-        } else {
-            matchClass = 'match-weak';
-            matchLabel = 'Weak';
-        }
-        
-        html += '<tr>';
-        html += `<td><span class="badge bg-primary">${rec.Rank}</span></td>`;
-        html += `<td>${rec.Job_Name}</td>`;
-        html += `<td>${rec.Training_Program}</td>`;
-        html += `<td><strong>${(score * 100).toFixed(2)}%</strong></td>`;
-        html += `<td><span class="badge ${matchClass}">${matchLabel}</span></td>`;
-        html += '</tr>';
-    });
-    
-    html += '</tbody></table></div>';
-    $('#resultsContainer').html(html);
-    
-    // Initialize DataTable
-    $('#recTable').DataTable({
-        pageLength: 25,
-        order: [[0, 'asc']],
-        language: {
-            search: "Search recommendations:"
-        }
-    });
-}
-
-function exportRecommendations(format) {
-    if (currentRecommendations.length === 0) {
-        alert('No recommendations to export');
-        return;
-    }
-    
-    $.ajax({
-        url: '/api/export-recommendations',
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({
-            recommendations: currentRecommendations,
-            format: format
-        }),
-        xhrFields: {
-            responseType: 'blob'
-        },
-        success: function(blob) {
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `recommendations.${format === 'excel' ? 'xlsx' : 'csv'}`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        },
-        error: function() {
-            alert('Failed to export recommendations');
-        }
-    });
-}
-</script>
+<script src="{{ url_for('static', filename='js/recommendations.js') }}"></script>
 {% endblock %}

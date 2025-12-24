@@ -153,15 +153,15 @@
                 <p>Ready to find the best training program matches for your job positions?</p>
                 
                 <div class="mt-auto">
-                    <a href="/database" class="btn btn-primary w-100 mb-2">
+                    <a href="{{ url_for('main.database') }}" class="btn btn-primary w-100 mb-2">
                         <i class="fas fa-database me-2"></i>
                         Configure Database
                     </a>
-                    <a href="/import" class="btn btn-success w-100 mb-2">
+                    <a href="{{ url_for('data_import.import_data') }}" class="btn btn-success w-100 mb-2">
                         <i class="fas fa-file-import me-2"></i>
                         Import Data
                     </a>
-                    <a href="/preprocessing" class="btn btn-info w-100 mb-2">
+                    <a href="{{ url_for('preprocessing.preprocessing') }}" class="btn btn-info w-100 mb-2">
                         <i class="fas fa-cogs me-2"></i>
                         Start Preprocessing
                     </a>

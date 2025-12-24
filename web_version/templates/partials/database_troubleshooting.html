@@ -1,0 +1,70 @@
+<div class="card mt-4">
+    <div class="card-header">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        Troubleshooting
+    </div>
+    <div class="card-body">
+        <div class="accordion" id="troubleshootingAccordion">
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" 
+                            data-bs-toggle="collapse" data-bs-target="#trouble1">
+                        Can't connect to MySQL server
+                    </button>
+                </h2>
+                <div id="trouble1" class="accordion-collapse collapse" 
+                     data-bs-parent="#troubleshootingAccordion">
+                    <div class="accordion-body">
+                        <strong>Solutions:</strong>
+                        <ul>
+                            <li>Check if MySQL service is running</li>
+                            <li>Verify the port number (3306 or 3307)</li>
+                            <li>Check firewall settings</li>
+                            <li>Try using 127.0.0.1 instead of localhost</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" 
+                            data-bs-toggle="collapse" data-bs-target="#trouble2">
+                        Access denied for user
+                    </button>
+                </h2>
+                <div id="trouble2" class="accordion-collapse collapse" 
+                     data-bs-parent="#troubleshootingAccordion">
+                    <div class="accordion-body">
+                        <strong>Solutions:</strong>
+                        <ul>
+                            <li>Check username and password are correct</li>
+                            <li>Verify user has access to the database</li>
+                            <li>Try creating a new MySQL user</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" 
+                            data-bs-toggle="collapse" data-bs-target="#trouble3">
+                        Unknown database 'bbpvp_thesis'
+                    </button>
+                </h2>
+                <div id="trouble3" class="accordion-collapse collapse" 
+                     data-bs-parent="#troubleshootingAccordion">
+                    <div class="accordion-body">
+                        <strong>Solutions:</strong>
+                        <ul>
+                            <li>Import the bbpvp.sql file first</li>
+                            <li>Create the database manually: <code>CREATE DATABASE bbpvp_thesis;</code></li>
+                            <li>Check database name spelling</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
