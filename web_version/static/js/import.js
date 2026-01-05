@@ -45,6 +45,15 @@ function loadData(type) {
                      type === 'training' ? '#btnLoadTraining' : '#btnLoadJobs';
     const $button = $(buttonId);
     
+    // Validate files for local source
+    if (source === 'local') {
+        const validation = validateLocalFiles(type);
+        if (!validation.valid) {
+            showAlert('danger', validation.message);
+            return;
+        }
+    }
+    
     // Disable button and show loading
     const originalText = $button.html();
     $button.prop('disabled', true)
@@ -64,15 +73,40 @@ function loadData(type) {
     addImportLog('='.repeat(80), 'info');
     addImportLog(`Source: ${source}`, 'info');
     
-    if (source === 'local') {
-        addImportLog('Local file upload not yet implemented', 'warning');
-        $button.prop('disabled', false).html(originalText);
-        return;
+    if (source === 'github') {
+        loadFromGithub(type, $button, originalText);
+    } else {
+        loadFromLocal(type, $button, originalText);
+    }
+}
+
+function validateLocalFiles(type) {
+    if (type === 'both' || type === 'training') {
+        const trainingFile = $('#trainingFile')[0].files[0];
+        if (!trainingFile) {
+            return {
+                valid: false,
+                message: '<strong>Error!</strong> Please select a training programs file.'
+            };
+        }
     }
     
-    // Make API request
+    if (type === 'both' || type === 'jobs') {
+        const jobFile = $('#jobFile')[0].files[0];
+        if (!jobFile) {
+            return {
+                valid: false,
+                message: '<strong>Error!</strong> Please select a job positions file.'
+            };
+        }
+    }
+    
+    return { valid: true };
+}
+
+function loadFromGithub(type, $button, originalText) {
     makeRequest('/api/load-data', 'POST', {
-        source: source,
+        source: 'github',
         type: type
     }, {
         onSuccess: function(response) {
@@ -89,6 +123,70 @@ function loadData(type) {
             $button.prop('disabled', false).html(originalText);
         }
     });
+}
+
+function loadFromLocal(type, $button, originalText) {
+    const formData = new FormData();
+    formData.append('source', 'local');
+    formData.append('type', type);
+    
+    // Add files based on type
+    if (type === 'both' || type === 'training') {
+        const trainingFile = $('#trainingFile')[0].files[0];
+        if (trainingFile) {
+            formData.append('training_file', trainingFile);
+            addImportLog(`Training file: ${trainingFile.name} (${formatFileSize(trainingFile.size)})`, 'info');
+        }
+    }
+    
+    if (type === 'both' || type === 'jobs') {
+        const jobFile = $('#jobFile')[0].files[0];
+        if (jobFile) {
+            formData.append('job_file', jobFile);
+            addImportLog(`Job file: ${jobFile.name} (${formatFileSize(jobFile.size)})`, 'info');
+        }
+    }
+    
+    addImportLog('Uploading files...', 'info');
+    
+    // Use jQuery AJAX for file upload
+    $.ajax({
+        url: '/api/load-data',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            if (response.success) {
+                handleLoadSuccess(response);
+            } else {
+                handleLoadError(response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            let errorMessage = 'An unexpected error occurred. Please try again.';
+            try {
+                const response = JSON.parse(xhr.responseText);
+                if (response.message) {
+                    errorMessage = response.message;
+                }
+            } catch (e) {
+                // Use default error message
+            }
+            handleLoadError(errorMessage);
+        },
+        complete: function() {
+            $button.prop('disabled', false).html(originalText);
+        }
+    });
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
 function handleLoadSuccess(response) {
