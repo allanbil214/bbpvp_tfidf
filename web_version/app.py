@@ -9,6 +9,7 @@ from config import SECRET_KEY, MAX_CONTENT_LENGTH
 # Import blueprints
 from routes.main import main_bp
 from routes.data_import import data_import_bp
+from routes.view_data import view_data_bp  # NEW
 from routes.preprocessing import preprocessing_bp
 from routes.tfidf import tfidf_bp
 from routes.recommendations import recommendations_bp
@@ -25,6 +26,7 @@ def create_app():
     # Register blueprints
     app.register_blueprint(main_bp)
     app.register_blueprint(data_import_bp)
+    app.register_blueprint(view_data_bp) 
     app.register_blueprint(preprocessing_bp)
     app.register_blueprint(tfidf_bp)
     app.register_blueprint(recommendations_bp)

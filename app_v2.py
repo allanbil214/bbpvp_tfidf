@@ -46,7 +46,21 @@ class BBPVPMatchingGUI:
             'charset': 'utf8mb4',
             'use_unicode': True
         }
-        
+
+        self.match_thresholds = {
+            'excellent': 0.40,
+            'very_good': 0.30,
+            'good': 0.20,
+            'fair': 0.10
+        }
+
+        self.default_match_thresholds = {
+            'excellent': 0.40,
+            'very_good': 0.30,
+            'good': 0.20,
+            'fair': 0.10
+        }
+
         self.db_connection = None
         self.current_experiment_id = None
         self.connect_to_database()
@@ -82,33 +96,42 @@ class BBPVPMatchingGUI:
                 "visible": True,
                 "builder": self.create_database_tab
             },
+            "settings": {  # NEW
+                "title": "0. Settings",
+                "visible": True,
+                "builder": self.create_settings_tab
+            },
             "import": {
                 "title": "1. Import Data",
                 "visible": True,
                 "builder": self.create_import_tab
             },
+            "view": {  # NEW
+                "title": "2. View Data",
+                "visible": True,
+                "builder": self.create_view_data_tab
+            },
             "preprocess": {
-                "title": "2. Preprocessing",
+                "title": "3. Preprocessing",
                 "visible": True,
                 "builder": self.create_preprocess_tab
             },
             "tfidf": {
-                "title": "3. TF-IDF & Cosine Similarity",
+                "title": "4. TF-IDF & Cosine Similarity",
                 "visible": True,
                 "builder": self.create_tfidf_tab
             },
             "recommendations": {
-                "title": "4. Recommendations",
+                "title": "5. Recommendations",
                 "visible": True,
                 "builder": self.create_recommendations_tab
             },
             "results": {
-                "title": "5. Results & Analysis (WIP)",
+                "title": "7. Results & Analysis (WIP)",
                 "visible": False,
                 "builder": self.create_results_tab
             }
         }
-
         self.create_widgets()
         
     def create_widgets(self):
@@ -328,7 +351,80 @@ class BBPVPMatchingGUI:
         self.import_status = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, 
                                                        font=('Consolas', 9))
         self.import_status.pack(fill='both', expand=True)
+
+    def create_view_data_tab(self, parent):
+        """Create simplified view data tab"""
+        # Main frame with left-right layout
+        main_frame = ttk.Frame(parent, padding="10")
+        main_frame.pack(fill='both', expand=True)
         
+        # Left panel - Controls (fixed width)
+        left_frame = ttk.Frame(main_frame, width=350)
+        left_frame.pack(side='left', fill='y', padx=(0, 10))
+        left_frame.pack_propagate(False)
+        
+        title = ttk.Label(left_frame, text="View Data", font=('Arial', 14, 'bold'))
+        title.pack(pady=10)
+        
+        # Dataset selection
+        dataset_frame = ttk.LabelFrame(left_frame, text="Select Dataset", padding="10")
+        dataset_frame.pack(fill='x', pady=10)
+        
+        self.view_dataset_var = tk.StringVar(value="training")
+        ttk.Radiobutton(dataset_frame, text="Training Programs", 
+                    variable=self.view_dataset_var, value="training").pack(anchor='w', pady=3)
+        ttk.Radiobutton(dataset_frame, text="Job Positions", 
+                    variable=self.view_dataset_var, value="job").pack(anchor='w', pady=3)
+        
+        # Records to display
+        display_frame = ttk.LabelFrame(left_frame, text="Display Options", padding="10")
+        display_frame.pack(fill='x', pady=10)
+        
+        ttk.Label(display_frame, text="Records to show:").pack(anchor='w', pady=3)
+        self.view_records_spinbox = ttk.Spinbox(display_frame, from_=5, to=100, increment=5, width=15)
+        self.view_records_spinbox.set(20)
+        self.view_records_spinbox.pack(anchor='w', pady=5)
+        
+        # View style selection
+        style_frame = ttk.LabelFrame(left_frame, text="View Style", padding="10")
+        style_frame.pack(fill='x', pady=10)
+        
+        ttk.Button(style_frame, text="📊 Table View (Horizontal)", 
+                command=self.show_data_table_view,
+                style='Accent.TButton', width=30).pack(pady=5)
+        
+        ttk.Button(style_frame, text="📋 List View (Vertical)", 
+                command=self.show_data_list_view,
+                width=30).pack(pady=5)
+        
+        # Info
+        info_frame = ttk.LabelFrame(left_frame, text="💡 Info", padding="10")
+        info_frame.pack(fill='x', pady=10)
+        
+        info_text = tk.Text(info_frame, height=8, wrap=tk.WORD, font=('Arial', 8))
+        info_text.pack(fill='x')
+        info_text.insert(1.0, 
+            "Browse imported datasets:\n\n"
+            "1. Select dataset type\n"
+            "2. Choose records to display\n"
+            "3. Pick view style:\n"
+            "   • Table: Excel-like grid\n"
+            "   • List: Detailed vertical\n"
+            "4. View results on the right →"
+        )
+        info_text.config(state='disabled')
+        
+        # Right panel - Data display
+        right_frame = ttk.Frame(main_frame)
+        right_frame.pack(side='left', fill='both', expand=True)
+        
+        ttk.Label(right_frame, text="Dataset Browser", 
+                font=('Arial', 12, 'bold')).pack(pady=5)
+        
+        self.view_output = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, 
+                                                    font=('Consolas', 9))
+        self.view_output.pack(fill='both', expand=True)
+
     def create_preprocess_tab(self, parent):
         # Main frame with two columns
         main_frame = ttk.Frame(parent, padding="10")
@@ -413,6 +509,9 @@ class BBPVPMatchingGUI:
         doc_frame = ttk.LabelFrame(left_frame, text="Select Documents", padding="10")
         doc_frame.pack(fill='x', pady=10)
         
+        ttk.Button(doc_frame, text="Load Document Options", 
+                  command=self.load_document_options, width=30).pack(pady=5)
+
         ttk.Label(doc_frame, text="Training Program:").pack(anchor='w', pady=2)
         self.pelatihan_combo = ttk.Combobox(doc_frame, state='readonly', width=35)
         self.pelatihan_combo.pack(fill='x', pady=5)
@@ -420,9 +519,6 @@ class BBPVPMatchingGUI:
         ttk.Label(doc_frame, text="Job Position:").pack(anchor='w', pady=2)
         self.lowongan_combo = ttk.Combobox(doc_frame, state='readonly', width=35)
         self.lowongan_combo.pack(fill='x', pady=5)
-        
-        ttk.Button(doc_frame, text="Load Document Options", 
-                  command=self.load_document_options, width=30).pack(pady=5)
         
         # Step buttons
         step_frame = ttk.LabelFrame(left_frame, text="TF-IDF Steps", padding="10")
@@ -575,7 +671,220 @@ class BBPVPMatchingGUI:
         self.rec_output = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, 
                                                     font=('Consolas', 9))
         self.rec_output.pack(fill='both', expand=True)
+
+    def create_settings_tab(self, parent):
+        """Create settings tab for threshold configuration"""
+        # Main frame with left-right layout
+        main_frame = ttk.Frame(parent, padding="10")
+        main_frame.pack(fill='both', expand=True)
         
+        # Left panel - Controls (fixed width)
+        left_frame = ttk.Frame(main_frame, width=450)
+        left_frame.pack(side='left', fill='y', padx=(0, 10))
+        left_frame.pack_propagate(False)
+        
+        title = ttk.Label(left_frame, text="Match Level Settings", font=('Arial', 14, 'bold'))
+        title.pack(pady=10)
+        
+        # Info alert
+        info_frame = ttk.LabelFrame(left_frame, text="ℹ️ About Thresholds", padding="10")
+        info_frame.pack(fill='x', pady=10)
+        
+        info_text = tk.Text(info_frame, height=4, wrap=tk.WORD, font=('Arial', 9))
+        info_text.pack(fill='x')
+        info_text.insert(1.0,
+            "These thresholds determine how similarity scores are classified. "
+            "Adjust them to make matching more strict (higher values) or more lenient (lower values)."
+        )
+        info_text.config(state='disabled')
+        
+        # Threshold settings
+        settings_frame = ttk.LabelFrame(left_frame, text="Configure Thresholds", padding="15")
+        settings_frame.pack(fill='x', pady=10)
+        
+        # Excellent
+        ttk.Label(settings_frame, text="🟢 Excellent Match (≥):", font=('Arial', 10, 'bold')).grid(row=0, column=0, sticky='w', pady=8)
+        self.excellent_scale = ttk.Scale(settings_frame, from_=0, to=1, orient='horizontal')
+        self.excellent_scale.set(self.match_thresholds['excellent'])
+        self.excellent_scale.grid(row=0, column=1, sticky='ew', padx=10)
+        self.excellent_label = ttk.Label(settings_frame, text=f"{self.match_thresholds['excellent']:.2f}", width=6)
+        self.excellent_label.grid(row=0, column=2)
+        self.excellent_scale.config(command=lambda v: self.excellent_label.config(text=f"{float(v):.2f}"))
+        
+        # Very Good
+        ttk.Label(settings_frame, text="🟢 Very Good Match (≥):", font=('Arial', 10, 'bold')).grid(row=1, column=0, sticky='w', pady=8)
+        self.very_good_scale = ttk.Scale(settings_frame, from_=0, to=1, orient='horizontal')
+        self.very_good_scale.set(self.match_thresholds['very_good'])
+        self.very_good_scale.grid(row=1, column=1, sticky='ew', padx=10)
+        self.very_good_label = ttk.Label(settings_frame, text=f"{self.match_thresholds['very_good']:.2f}", width=6)
+        self.very_good_label.grid(row=1, column=2)
+        self.very_good_scale.config(command=lambda v: self.very_good_label.config(text=f"{float(v):.2f}"))
+        
+        # Good
+        ttk.Label(settings_frame, text="🟡 Good Match (≥):", font=('Arial', 10, 'bold')).grid(row=2, column=0, sticky='w', pady=8)
+        self.good_scale = ttk.Scale(settings_frame, from_=0, to=1, orient='horizontal')
+        self.good_scale.set(self.match_thresholds['good'])
+        self.good_scale.grid(row=2, column=1, sticky='ew', padx=10)
+        self.good_label = ttk.Label(settings_frame, text=f"{self.match_thresholds['good']:.2f}", width=6)
+        self.good_label.grid(row=2, column=2)
+        self.good_scale.config(command=lambda v: self.good_label.config(text=f"{float(v):.2f}"))
+        
+        # Fair
+        ttk.Label(settings_frame, text="🟡 Fair Match (≥):", font=('Arial', 10, 'bold')).grid(row=3, column=0, sticky='w', pady=8)
+        self.fair_scale = ttk.Scale(settings_frame, from_=0, to=1, orient='horizontal')
+        self.fair_scale.set(self.match_thresholds['fair'])
+        self.fair_scale.grid(row=3, column=1, sticky='ew', padx=10)
+        self.fair_label = ttk.Label(settings_frame, text=f"{self.match_thresholds['fair']:.2f}", width=6)
+        self.fair_label.grid(row=3, column=2)
+        self.fair_scale.config(command=lambda v: self.fair_label.config(text=f"{float(v):.2f}"))
+        
+        # Weak (info only)
+        ttk.Label(settings_frame, text="🔴 Weak Match:", font=('Arial', 10, 'bold')).grid(row=4, column=0, sticky='w', pady=8)
+        ttk.Label(settings_frame, text="< Fair threshold (automatic)", font=('Arial', 9, 'italic')).grid(row=4, column=1, columnspan=2, sticky='w', padx=10)
+        
+        settings_frame.columnconfigure(1, weight=1)
+        
+        # Buttons
+        button_frame = ttk.LabelFrame(left_frame, text="Actions", padding="10")
+        button_frame.pack(fill='x', pady=10)
+        
+        ttk.Button(button_frame, text="💾 Save Settings", 
+                command=self.save_threshold_settings,
+                style='Accent.TButton', width=35).pack(pady=5)
+        
+        ttk.Button(button_frame, text="↺ Reset to Defaults", 
+                command=self.reset_threshold_settings, width=35).pack(pady=5)
+        
+        # Guidelines
+        guide_frame = ttk.LabelFrame(left_frame, text="📋 Guidelines", padding="10")
+        guide_frame.pack(fill='x', pady=10)
+        
+        guide_text = tk.Text(guide_frame, height=8, wrap=tk.WORD, font=('Arial', 9))
+        guide_text.pack(fill='x')
+        guide_text.insert(1.0,
+            "How to Use:\n"
+            "1. Adjust sliders to set threshold values (0.00 to 1.00)\n"
+            "2. Ensure descending order: Excellent > Very Good > Good > Fair\n"
+            "3. Click 'Save Settings' to apply\n\n"
+            "Tips:\n"
+            "• Higher thresholds = stricter matching\n"
+            "• Lower thresholds = more lenient matching\n"
+            "• Default values: 0.40, 0.30, 0.20, 0.10"
+        )
+        guide_text.config(state='disabled')
+        
+        # Right panel - Preview
+        right_frame = ttk.Frame(main_frame)
+        right_frame.pack(side='left', fill='both', expand=True)
+        
+        ttk.Label(right_frame, text="Current Threshold Ranges", 
+                font=('Arial', 12, 'bold')).pack(pady=5)
+        
+        # Preview table
+        preview_frame = ttk.LabelFrame(right_frame, text="Match Level Ranges", padding="10")
+        preview_frame.pack(fill='both', expand=True, pady=10)
+        
+        self.threshold_preview = scrolledtext.ScrolledText(preview_frame, wrap=tk.WORD, 
+                                                        font=('Consolas', 10), height=20)
+        self.threshold_preview.pack(fill='both', expand=True)
+        
+        # Initial preview
+        self.update_threshold_preview()
+
+    def save_threshold_settings(self):
+        """Save threshold settings"""
+        # Get values
+        excellent = float(self.excellent_scale.get())
+        very_good = float(self.very_good_scale.get())
+        good = float(self.good_scale.get())
+        fair = float(self.fair_scale.get())
+        
+        # Validate
+        if not (excellent > very_good > good > fair >= 0):
+            messagebox.showerror("Invalid Settings", 
+                            "Thresholds must be in descending order:\n"
+                            "Excellent > Very Good > Good > Fair ≥ 0")
+            return
+        
+        if not all(0 <= v <= 1 for v in [excellent, very_good, good, fair]):
+            messagebox.showerror("Invalid Settings", 
+                            "All thresholds must be between 0 and 1")
+            return
+        
+        # Save
+        self.match_thresholds = {
+            'excellent': excellent,
+            'very_good': very_good,
+            'good': good,
+            'fair': fair
+        }
+        
+        self.update_threshold_preview()
+        messagebox.showinfo("Success", 
+                        "Settings saved successfully!\n\n"
+                        "New thresholds will be used for future recommendations.")
+
+    def reset_threshold_settings(self):
+        """Reset thresholds to defaults"""
+        if messagebox.askyesno("Confirm Reset", 
+                            "Reset all thresholds to default values?"):
+            self.match_thresholds = self.default_match_thresholds.copy()
+            
+            self.excellent_scale.set(self.match_thresholds['excellent'])
+            self.very_good_scale.set(self.match_thresholds['very_good'])
+            self.good_scale.set(self.match_thresholds['good'])
+            self.fair_scale.set(self.match_thresholds['fair'])
+            
+            self.update_threshold_preview()
+            messagebox.showinfo("Reset Complete", "Thresholds reset to default values")
+
+    def update_threshold_preview(self):
+        """Update threshold preview display"""
+        self.threshold_preview.delete(1.0, tk.END)
+        
+        t = self.match_thresholds
+        
+        preview = f"""
+    {'=' * 60}
+    MATCH LEVEL THRESHOLD RANGES
+    {'=' * 60}
+
+    🟢 EXCELLENT MATCH
+    Range: ≥ {t['excellent']:.2f} ({t['excellent']*100:.0f}%)
+    Description: Top tier matches
+
+    🟢 VERY GOOD MATCH
+    Range: {t['very_good']:.2f} to {t['excellent']:.2f} ({t['very_good']*100:.0f}% - {t['excellent']*100:.0f}%)
+    Description: High quality matches
+
+    🟡 GOOD MATCH
+    Range: {t['good']:.2f} to {t['very_good']:.2f} ({t['good']*100:.0f}% - {t['very_good']*100:.0f}%)
+    Description: Acceptable matches
+
+    🟡 FAIR MATCH
+    Range: {t['fair']:.2f} to {t['good']:.2f} ({t['fair']*100:.0f}% - {t['good']*100:.0f}%)
+    Description: Marginal matches
+
+    🔴 WEAK MATCH
+    Range: < {t['fair']:.2f} (< {t['fair']*100:.0f}%)
+    Description: Poor matches
+
+    {'=' * 60}
+
+    💡 These thresholds determine how similarity scores are 
+    classified in recommendations.
+
+    📊 Current Settings:
+    • Excellent: {t['excellent']:.2f}
+    • Very Good: {t['very_good']:.2f}
+    • Good:      {t['good']:.2f}
+    • Fair:      {t['fair']:.2f}
+
+    {'=' * 60}
+    """
+        
+        self.threshold_preview.insert(1.0, preview)
+
     def create_results_tab(self, parent):
         # Main frame with left-right layout
         main_frame = ttk.Frame(parent, padding="10")
@@ -959,7 +1268,161 @@ class BBPVPMatchingGUI:
                 self.log_message(f"✗ Error: {str(e)}")
         
         threading.Thread(target=load, daemon=True).start()
-    
+
+    def show_data_table_view(self):
+        """Show data in horizontal table format (Excel-like)"""
+        self.view_output.delete(1.0, tk.END)
+        
+        dataset_type = self.view_dataset_var.get()
+        
+        if dataset_type == "training":
+            df = self.df_pelatihan
+            if df is None:
+                self.log_message("❌ Please load training data first!", self.view_output)
+                return
+            title = "TRAINING PROGRAMS DATA - TABLE VIEW"
+        else:
+            df = self.df_lowongan
+            if df is None:
+                self.log_message("❌ Please load job data first!", self.view_output)
+                return
+            title = "JOB POSITIONS DATA - TABLE VIEW"
+        
+        try:
+            n_records = int(self.view_records_spinbox.get())
+        except:
+            n_records = 20
+        
+        n_records = min(n_records, len(df))
+        
+        # Display header
+        self.log_message("=" * 150, self.view_output)
+        self.log_message(title, self.view_output)
+        self.log_message("=" * 150, self.view_output)
+        self.log_message(f"\n📊 Total records: {len(df)} | Showing: {n_records} records", self.view_output)
+        self.log_message(f"📋 Total columns: {len(df.columns)}\n", self.view_output)
+        
+        # Get all column names
+        columns = df.columns.tolist()
+        
+        # Create table header
+        self.log_message("=" * 150, self.view_output)
+        
+        # Column headers
+        col_width = 30  # Fixed width for each column
+        header_line = "│ " + " │ ".join([f"{col[:28]:^28}" for col in columns]) + " │"
+        separator = "├" + "┼".join(["─" * 30 for _ in columns]) + "┤"
+        top_border = "┌" + "┬".join(["─" * 30 for _ in columns]) + "┐"
+        bottom_border = "└" + "┴".join(["─" * 30 for _ in columns]) + "┘"
+        
+        self.log_message(top_border, self.view_output)
+        self.log_message(header_line, self.view_output)
+        self.log_message(separator, self.view_output)
+        
+        # Display rows
+        for idx in range(n_records):
+            row = df.iloc[idx]
+            
+            # Truncate long values
+            row_values = []
+            for col in columns:
+                val = str(row[col]) if pd.notna(row[col]) else ""
+                # Truncate if too long
+                if len(val) > 28:
+                    val = val[:25] + "..."
+                row_values.append(f"{val:<28}")
+            
+            row_line = "│ " + " │ ".join(row_values) + " │"
+            self.log_message(row_line, self.view_output)
+        
+        self.log_message(bottom_border, self.view_output)
+        
+        self.log_message(f"\n{'=' * 150}", self.view_output)
+        self.log_message(f"✅ DISPLAYED {n_records} of {len(df)} RECORDS", self.view_output)
+        self.log_message(f"{'=' * 150}", self.view_output)
+        
+        # Show column list
+        self.log_message(f"\n📋 Column Names ({len(columns)} total):", self.view_output)
+        for i, col in enumerate(columns, 1):
+            self.log_message(f"  {i}. {col}", self.view_output)
+
+    def show_data_list_view(self):
+        """Show data in vertical list format (detailed)"""
+        self.view_output.delete(1.0, tk.END)
+        
+        dataset_type = self.view_dataset_var.get()
+        
+        if dataset_type == "training":
+            df = self.df_pelatihan
+            if df is None:
+                self.log_message("❌ Please load training data first!", self.view_output)
+                return
+            title = "TRAINING PROGRAMS DATA - LIST VIEW"
+        else:
+            df = self.df_lowongan
+            if df is None:
+                self.log_message("❌ Please load job data first!", self.view_output)
+                return
+            title = "JOB POSITIONS DATA - LIST VIEW"
+        
+        try:
+            n_records = int(self.view_records_spinbox.get())
+        except:
+            n_records = 20
+        
+        n_records = min(n_records, len(df))
+        
+        # Display header
+        self.log_message("=" * 120, self.view_output)
+        self.log_message(title, self.view_output)
+        self.log_message("=" * 120, self.view_output)
+        self.log_message(f"\n📊 Total records: {len(df)} | Showing: {n_records} records", self.view_output)
+        self.log_message(f"📋 Total columns: {len(df.columns)}\n", self.view_output)
+        
+        # Get all column names
+        columns = df.columns.tolist()
+        
+        # Display each record with all columns
+        for idx in range(n_records):
+            row = df.iloc[idx]
+            
+            self.log_message("\n" + "─" * 120, self.view_output)
+            self.log_message(f"📋 RECORD #{idx}", self.view_output)
+            self.log_message("─" * 120, self.view_output)
+            
+            # Create a table for this record
+            self.log_message(f"┌{'─' * 35}┬{'─' * 82}┐", self.view_output)
+            self.log_message(f"│ {'Column Name':<33} │ {'Value':<80} │", self.view_output)
+            self.log_message(f"├{'─' * 35}┼{'─' * 82}┤", self.view_output)
+            
+            for col in columns:
+                value = str(row[col]) if pd.notna(row[col]) else "(empty)"
+                
+                # Handle long values - split into multiple lines
+                max_width = 80
+                if len(value) <= max_width:
+                    self.log_message(f"│ {col:<33} │ {value:<80} │", self.view_output)
+                else:
+                    # First line
+                    self.log_message(f"│ {col:<33} │ {value[:max_width]:<80} │", self.view_output)
+                    # Continuation lines
+                    remaining = value[max_width:]
+                    while remaining:
+                        chunk = remaining[:max_width]
+                        remaining = remaining[max_width:]
+                        self.log_message(f"│ {'':<33} │ {chunk:<80} │", self.view_output)
+            
+            self.log_message(f"└{'─' * 35}┴{'─' * 82}┘", self.view_output)
+        
+        self.log_message(f"\n{'=' * 120}", self.view_output)
+        self.log_message(f"✅ DISPLAYED {n_records} of {len(df)} RECORDS", self.view_output)
+        self.log_message(f"{'=' * 120}", self.view_output)
+        
+        # Show column summary
+        self.log_message(f"\n📋 All Columns ({len(columns)} total):", self.view_output)
+        for i, col in enumerate(columns, 1):
+            self.log_message(f"  {i:2d}. {col}", self.view_output)
+
     def fill_missing_pelatihan(self):
         """Fill missing values in training data"""
         def fill_tujuan(row):
@@ -977,7 +1440,7 @@ class BBPVPMatchingGUI:
         self.df_pelatihan['Tujuan/Kompetensi'] = self.df_pelatihan.apply(fill_tujuan, axis=1)
         self.df_pelatihan['Deskripsi Program'] = self.df_pelatihan.apply(fill_deskripsi, axis=1)
         self.log_message("✓ Missing values filled")
-        
+
     def expand_synonyms(self, text):
         synonym_map = {
             'tata udara': 'ac tata udara',
@@ -1571,19 +2034,23 @@ class BBPVPMatchingGUI:
         self.log_message(f"   • Minimum Similarity: {min_similarity:.4f} ({min_similarity*100:.2f}%)", self.tfidf_output)
         
         # Count by match levels
-        excellent = np.sum(similarity_matrix >= 0.80)
-        very_good = np.sum((similarity_matrix >= 0.65) & (similarity_matrix < 0.80))
-        good = np.sum((similarity_matrix >= 0.50) & (similarity_matrix < 0.65))
-        fair = np.sum((similarity_matrix >= 0.35) & (similarity_matrix < 0.50))
-        weak = np.sum(similarity_matrix < 0.35)
-        
+        # Count by match levels using self.match_thresholds
+        excellent = np.sum(similarity_matrix >= self.match_thresholds['excellent'])
+        very_good = np.sum((similarity_matrix >= self.match_thresholds['very_good']) & 
+                        (similarity_matrix < self.match_thresholds['excellent']))
+        good = np.sum((similarity_matrix >= self.match_thresholds['good']) & 
+                    (similarity_matrix < self.match_thresholds['very_good']))
+        fair = np.sum((similarity_matrix >= self.match_thresholds['fair']) & 
+                    (similarity_matrix < self.match_thresholds['good']))
+        weak = np.sum(similarity_matrix < self.match_thresholds['fair'])
+
         self.log_message(f"\n🎯 Match Level Distribution:", self.tfidf_output)
-        self.log_message(f"   • 🟢 Excellent (≥80%): {excellent} pairs ({excellent/similarity_matrix.size*100:.1f}%)", self.tfidf_output)
-        self.log_message(f"   • 🟢 Very Good (65-79%): {very_good} pairs ({very_good/similarity_matrix.size*100:.1f}%)", self.tfidf_output)
-        self.log_message(f"   • 🟡 Good (50-64%): {good} pairs ({good/similarity_matrix.size*100:.1f}%)", self.tfidf_output)
-        self.log_message(f"   • 🟡 Fair (35-49%): {fair} pairs ({fair/similarity_matrix.size*100:.1f}%)", self.tfidf_output)
-        self.log_message(f"   • 🔴 Weak (<35%): {weak} pairs ({weak/similarity_matrix.size*100:.1f}%)", self.tfidf_output)
-        
+        self.log_message(f"   • 🟢 Excellent (≥{self.match_thresholds['excellent']*100:.0f}%): {excellent} pairs ({excellent/similarity_matrix.size*100:.1f}%)", self.tfidf_output)
+        self.log_message(f"   • 🟢 Very Good ({self.match_thresholds['very_good']*100:.0f}-{self.match_thresholds['excellent']*100-1:.0f}%): {very_good} pairs ({very_good/similarity_matrix.size*100:.1f}%)", self.tfidf_output)
+        self.log_message(f"   • 🟡 Good ({self.match_thresholds['good']*100:.0f}-{self.match_thresholds['very_good']*100-1:.0f}%): {good} pairs ({good/similarity_matrix.size*100:.1f}%)", self.tfidf_output)
+        self.log_message(f"   • 🟡 Fair ({self.match_thresholds['fair']*100:.0f}-{self.match_thresholds['good']*100-1:.0f}%): {fair} pairs ({fair/similarity_matrix.size*100:.1f}%)", self.tfidf_output)
+        self.log_message(f"   • 🔴 Weak (<{self.match_thresholds['fair']*100:.0f}%): {weak} pairs ({weak/similarity_matrix.size*100:.1f}%)", self.tfidf_output)     
+
         # Top matches for each job - SQL TABLE FORMAT
         self.log_message("\n\n" + "=" * 150, self.tfidf_output)
         self.log_message("TOP 3 TRAINING PROGRAMS FOR EACH JOB POSITION", self.tfidf_output)
@@ -2144,19 +2611,20 @@ class BBPVPMatchingGUI:
             
             for rank, pel_idx in enumerate(filtered_indices, 1):
                 program_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
-                similarity = similarities[pel_idx]
+                sim_score = similarities[pel_idx]
                 
                 # Determine match level
-                if similarity >= 0.80:
+                # Determine match level using self.match_thresholds
+                if sim_score >= self.match_thresholds['excellent']:
                     match_level = "excellent"
                     match_emoji = "🟢"
-                elif similarity >= 0.65:
+                elif sim_score >= self.match_thresholds['very_good']:
                     match_level = "very_good"
                     match_emoji = "🟢"
-                elif similarity >= 0.50:
+                elif sim_score >= self.match_thresholds['good']:
                     match_level = "good"
                     match_emoji = "🟡"
-                elif similarity >= 0.35:
+                elif sim_score >= self.match_thresholds['fair']:
                     match_level = "fair"
                     match_emoji = "🟡"
                 else:
@@ -2485,13 +2953,13 @@ class BBPVPMatchingGUI:
             for rec in self.all_recommendations:
                 # Determine match level
                 similarity = rec['Similarity_Score']
-                if similarity >= 0.80:
+                if similarity >= self.match_thresholds['excellent']:
                     match_level = 'excellent'
-                elif similarity >= 0.65:
+                elif similarity >= self.match_thresholds['very_good']:
                     match_level = 'very_good'
-                elif similarity >= 0.50:
+                elif similarity >= self.match_thresholds['good']:
                     match_level = 'good'
-                elif similarity >= 0.35:
+                elif similarity >= self.match_thresholds['fair']:
                     match_level = 'fair'
                 else:
                     match_level = 'weak'

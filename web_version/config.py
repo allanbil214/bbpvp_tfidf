@@ -42,10 +42,10 @@ TOTAL_SAVED_SAMPLE = 5
 
 # Default Match Thresholds
 DEFAULT_MATCH_THRESHOLDS = {
-    'excellent': 0.80,
-    'very_good': 0.65,
-    'good': 0.50,
-    'fair': 0.35
+    'excellent': 0.40,
+    'very_good': 0.30,
+    'good': 0.20,
+    'fair': 0.10
 }
 
 # Sastrawi Configuration

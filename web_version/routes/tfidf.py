@@ -6,6 +6,7 @@ from flask import Blueprint, render_template, request, jsonify # type: ignore
 from models.data_store import data_store
 from database.operations import save_similarity_matrix, save_tfidf_samples
 from utils.similarity import calculate_similarity_matrix, calculate_manual_tfidf
+from config import TOTAL_SAVED_SAMPLE
 
 tfidf_bp = Blueprint('tfidf', __name__)
 
@@ -41,7 +42,7 @@ def api_calculate_similarity():
         if experiment_id:
             save_similarity_matrix(experiment_id, similarity_matrix, df_pelatihan, df_lowongan)
             save_tfidf_samples(experiment_id, vectorizer, tfidf_matrix, 
-                             similarity_matrix, df_pelatihan, df_lowongan)
+                            similarity_matrix, df_pelatihan, df_lowongan, TOTAL_SAVED_SAMPLE)
         
         # Statistics
         avg_similarity = similarity_matrix.mean()
@@ -224,4 +225,50 @@ def api_tfidf_step():
         print(f"Error in TF-IDF step {step}: {e}")
         import traceback
         traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)})
+    
+@tfidf_bp.route('/api/save-tfidf-calculation', methods=['POST'])
+def api_save_tfidf_calculation():
+    """Save manual TF-IDF calculation to database"""
+    try:
+        data = request.json
+        training_idx = int(data.get('training_idx'))
+        job_idx = int(data.get('job_idx'))
+        step_data = data.get('step_data', {})
+        
+        experiment_id = data_store.current_experiment_id
+        
+        if not experiment_id:
+            return jsonify({'success': False, 'message': 'No active experiment'})
+        
+        df_pelatihan = data_store.df_pelatihan
+        df_lowongan = data_store.df_lowongan
+        
+        if df_pelatihan is None or df_lowongan is None:
+            return jsonify({'success': False, 'message': 'Data not loaded'})
+        
+        # Prepare calculation data
+        calculation_data = {
+            'training_name': df_pelatihan.iloc[training_idx]['PROGRAM PELATIHAN'],
+            'job_name': df_lowongan.iloc[job_idx]['Nama Jabatan'],
+            'all_terms': step_data.get('all_terms', []),
+            'tf_d1': step_data.get('tf_d1', {}),
+            'tf_d2': step_data.get('tf_d2', {}),
+            'idf_dict': step_data.get('idf_dict', {}),
+            'tfidf_d1': step_data.get('tfidf_d1', {}),
+            'tfidf_d2': step_data.get('tfidf_d2', {}),
+            'similarity': step_data.get('similarity', 0.0)
+        }
+        
+        # Save to database
+        from database.operations import save_tfidf_calculation
+        save_tfidf_calculation(experiment_id, training_idx, job_idx, calculation_data)
+        
+        return jsonify({
+            'success': True,
+            'message': 'TF-IDF calculation saved to database'
+        })
+    
+    except Exception as e:
+        print(f"Error saving TF-IDF calculation: {e}")
         return jsonify({'success': False, 'message': str(e)})

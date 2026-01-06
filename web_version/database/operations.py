@@ -118,7 +118,7 @@ def save_similarity_matrix(experiment_id, similarity_matrix, df_pelatihan, df_lo
     except Error as e:
         print(f"Error saving similarity matrix: {e}")
 
-def save_tfidf_samples(experiment_id, vectorizer, tfidf_matrix, similarity_matrix, df_pelatihan, df_lowongan):
+def save_tfidf_samples(experiment_id, vectorizer, tfidf_matrix, similarity_matrix, df_pelatihan, df_lowongan, sample_count=5):
     """Save sample TF-IDF calculations from sklearn results"""
     conn = get_db_connection()
     if not conn or not experiment_id:
@@ -127,7 +127,8 @@ def save_tfidf_samples(experiment_id, vectorizer, tfidf_matrix, similarity_matri
     try:
         cursor = conn.cursor()
         
-        sample_count = min(5, len(df_lowongan))
+        # Use configurable sample count, default to 5
+        actual_sample_count = min(sample_count, len(df_lowongan))
         
         query = """
         INSERT INTO tfidf_calculations 
@@ -140,7 +141,7 @@ def save_tfidf_samples(experiment_id, vectorizer, tfidf_matrix, similarity_matri
         n_pelatihan = len(df_pelatihan)
         
         batch_data = []
-        for low_idx in range(sample_count):
+        for low_idx in range(actual_sample_count):
             similarities = similarity_matrix[:, low_idx]
             top_pel_idx = int(np.argmax(similarities))
             
@@ -150,6 +151,7 @@ def save_tfidf_samples(experiment_id, vectorizer, tfidf_matrix, similarity_matri
             training_vector = tfidf_matrix[top_pel_idx].toarray()[0]
             job_vector = tfidf_matrix[n_pelatihan + low_idx].toarray()[0]
             
+            # Only store non-zero TF-IDF values
             tfidf_training = {term: float(training_vector[i]) 
                             for i, term in enumerate(feature_names) 
                             if training_vector[i] > 0}
@@ -182,6 +184,47 @@ def save_tfidf_samples(experiment_id, vectorizer, tfidf_matrix, similarity_matri
         
     except Error as e:
         print(f"✗ Error saving TF-IDF samples: {e}")
+
+def save_tfidf_calculation(experiment_id, pel_idx, low_idx, calculation_data):
+    """Save detailed TF-IDF calculation (manual step-by-step) to database"""
+    conn = get_db_connection()
+    if not conn or not experiment_id:
+        return
+    
+    try:
+        cursor = conn.cursor()
+        
+        query = """
+        INSERT INTO tfidf_calculations 
+        (experiment_id, training_index, training_name, job_index, job_name,
+        unique_terms_count, terms_json, tf_training_json, tf_job_json,
+        idf_json, tfidf_training_json, tfidf_job_json, cosine_similarity)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        
+        values = (
+            experiment_id,
+            int(pel_idx),
+            calculation_data['training_name'],
+            int(low_idx),
+            calculation_data['job_name'],
+            int(len(calculation_data['all_terms'])),
+            json.dumps(calculation_data['all_terms']),
+            json.dumps(calculation_data['tf_d1']),
+            json.dumps(calculation_data['tf_d2']),
+            json.dumps(calculation_data['idf_dict']),
+            json.dumps(calculation_data['tfidf_d1']),
+            json.dumps(calculation_data['tfidf_d2']),
+            float(calculation_data['similarity'])
+        )
+        
+        cursor.execute(query, values)
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("✓ TF-IDF calculation saved to database")
+    except Error as e:
+        print(f"✗ Error saving TF-IDF calculation: {e}")
 
 def save_recommendations(experiment_id, recommendations, thresholds):
     """Save recommendations to database"""

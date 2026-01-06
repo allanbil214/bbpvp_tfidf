@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}View Data - BBPVP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-table text-info me-3"></i>
+        View Data
+    </h1>
+    <p class="page-subtitle">Browse and inspect imported training programs and job positions</p>
+</div>
+
+{% if not has_training and not has_jobs %}
+<div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>Warning:</strong> No data loaded yet. 
+    Please go to <a href="{{ url_for('data_import.import_data') }}" class="alert-link">Import page</a> and load data first.
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <!-- Left Panel: Controls -->
+    <div class="col-lg-3">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-sliders-h me-2"></i>
+                Data Selection
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-database me-2"></i>
+                        Select Dataset
+                    </label>
+                    <select class="form-select" id="datasetSelect" {% if not has_training %}disabled{% endif %}>
+                        <option value="training" {% if has_training %}selected{% endif %}>
+                            Training Programs ({{ training_count }})
+                        </option>
+                        <option value="job" {% if has_jobs %}{% else %}disabled{% endif %}>
+                            Job Positions ({{ job_count }})
+                        </option>
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-list-ol me-2"></i>
+                        Records Per Page
+                    </label>
+                    <select class="form-select" id="perPageSelect">
+                        <option value="10" selected>10 records</option>
+                        <option value="25">25 records</option>
+                        <option value="50">50 records</option>
+                        <option value="100">100 records</option>
+                    </select>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary" id="btnLoadData" {% if not has_training %}disabled{% endif %}>
+                        <i class="fas fa-sync-alt me-2"></i>
+                        Load Data
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="fas fa-search me-2"></i>
+                Search
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <input type="text" class="form-control" id="searchInput" 
+                           placeholder="Search records..." {% if not has_training %}disabled{% endif %}>
+                </div>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success" id="btnSearch" {% if not has_training %}disabled{% endif %}>
+                        <i class="fas fa-search me-2"></i>
+                        Search
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" id="btnClearSearch" style="display: none;">
+                        <i class="fas fa-times me-1"></i>
+                        Clear Search
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-2"></i>
+                Data Statistics
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Training Programs:</span>
+                        <span class="badge bg-primary" id="statTraining">{{ training_count }}</span>
+                    </div>
+                    <div class="progress" style="height: 5px;">
+                        <div class="progress-bar" style="width: 100%;"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Job Positions:</span>
+                        <span class="badge bg-success" id="statJobs">{{ job_count }}</span>
+                    </div>
+                    <div class="progress" style="height: 5px;">
+                        <div class="progress-bar bg-success" style="width: 100%;"></div>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted"><strong>Total Records:</strong></span>
+                    <span class="badge bg-info" id="statTotal">{{ training_count + job_count }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Panel: Data Display -->
+    <div class="col-lg-9">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>
+                    <i class="fas fa-table me-2"></i>
+                    <span id="dataTitle">Data Records</span>
+                </span>
+                <span class="badge bg-light text-dark" id="recordCount">0 records</span>
+            </div>
+            <div class="card-body" style="min-height: 600px;">
+                <div id="dataDisplay">
+                    {% include 'partials/view_data_placeholder.html' %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pagination -->
+        <div class="card mt-3" id="paginationCard" style="display: none;">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <p class="mb-0 text-muted" id="paginationInfo">
+                            Showing 1 to 10 of 100 records
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <nav>
+                            <ul class="pagination justify-content-end mb-0" id="paginationControls">
+                                <!-- Pagination buttons will be inserted here -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Record Detail Modal -->
+<div class="modal fade" id="recordDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-file-alt me-2"></i>
+                    Record Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="recordDetailBody">
+                <!-- Record details will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/view_data.js') }}"></script>
+{% endblock %}

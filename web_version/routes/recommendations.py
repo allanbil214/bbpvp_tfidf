@@ -102,11 +102,27 @@ def api_get_recommendations():
                         'Similarity_Percentage': float(similarities[pel_idx] * 100)
                     })
         
-        # Save to database
+        # Save to database - ALWAYS save, whether single or all jobs
         experiment_id = data_store.current_experiment_id
-        if experiment_id and job_idx is None:  # Only save for all jobs
-            save_recommendations(experiment_id, recommendations, data_store.match_thresholds)
-            complete_experiment(experiment_id)
+        if experiment_id and len(recommendations) > 0:
+            try:
+                print(f"Saving {len(recommendations)} recommendations to database...")
+                save_recommendations(experiment_id, recommendations, data_store.match_thresholds)
+                
+                # Only complete experiment if it's "all jobs" mode
+                if job_idx is None:
+                    complete_experiment(experiment_id)
+                    print("✓ Experiment marked as completed")
+                
+                print("✓ Recommendations saved to database")
+            except Exception as e:
+                print(f"✗ Error saving recommendations: {e}")
+                # Don't fail the request, just log the error
+        else:
+            if not experiment_id:
+                print("⚠ Warning: No experiment_id found, recommendations not saved to database")
+            if len(recommendations) == 0:
+                print("⚠ Warning: No recommendations to save")
         
         print(f"✓ Generated {len(recommendations)} recommendations")
         
@@ -117,8 +133,10 @@ def api_get_recommendations():
     
     except Exception as e:
         print(f"✗ Error getting recommendations: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)})
-
+    
 @recommendations_bp.route('/api/export-recommendations', methods=['POST'])
 def api_export_recommendations():
     """Export recommendations to Excel or CSV"""

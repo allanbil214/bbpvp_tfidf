@@ -146,8 +146,81 @@ function executeStep(step, appendMode = false) {
                 }
                 
                 $('#btnClearOutput').show();
+                
+                // NEW: Save to database when step 6 (similarity) is complete
+                if (step === 6 && currentStepData.similarity) {
+                    saveTfidfCalculation(trainingIdx, jobIdx);
+                }
             }
         }
+    });
+}
+
+// NEW FUNCTION: Save manual TF-IDF calculation to database
+function saveTfidfCalculation(trainingIdx, jobIdx) {
+    // Only save if we have complete calculation data
+    if (!currentStepData.tfidfD1 || !currentStepData.tfidfD2 || !currentStepData.similarity) {
+        console.log('Incomplete calculation data, skipping database save');
+        return;
+    }
+    
+    console.log('Saving TF-IDF calculation to database...');
+    
+    makeRequest('/api/save-tfidf-calculation', 'POST', {
+        training_idx: trainingIdx,
+        job_idx: jobIdx,
+        step_data: currentStepData
+    }, {
+        onSuccess: function(response) {
+            if (response.success) {
+                console.log('✓ Manual TF-IDF calculation saved to database');
+                // Show subtle notification
+                showToast('Calculation saved to database', 'success');
+            }
+        },
+        onError: function() {
+            console.log('Note: Could not save calculation to database');
+        }
+    });
+}
+
+// NEW FUNCTION: Show toast notification
+function showToast(message, type = 'info') {
+    const bgColors = {
+        'success': 'bg-success',
+        'info': 'bg-info',
+        'warning': 'bg-warning',
+        'danger': 'bg-danger'
+    };
+    
+    const icons = {
+        'success': 'fa-check-circle',
+        'info': 'fa-info-circle',
+        'warning': 'fa-exclamation-triangle',
+        'danger': 'fa-times-circle'
+    };
+    
+    const toast = `
+        <div class="toast align-items-center text-white ${bgColors[type]} border-0 position-fixed bottom-0 end-0 m-3" 
+             role="alert" style="z-index: 9999;">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="fas ${icons[type]} me-2"></i>${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" 
+                        data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    $('body').append(toast);
+    const toastEl = $('.toast').last()[0];
+    const bsToast = new bootstrap.Toast(toastEl, { delay: 3000 });
+    bsToast.show();
+    
+    // Remove from DOM after hiding
+    $(toastEl).on('hidden.bs.toast', function() {
+        $(this).remove();
     });
 }
 
