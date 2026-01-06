@@ -3,6 +3,7 @@ BBPVP Job Matching System - GUI Application
 A complete GUI for text preprocessing and TF-IDF based job matching
 """
 # pip install pandas numpy scikit-learn matplotlib Sastrawi openpyxl mysql-connector-python
+# > use this symbol to fold level 2
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
