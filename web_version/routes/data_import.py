@@ -67,9 +67,8 @@ def load_from_github(load_type):
         if load_type in ['both', 'training']:
             print(f"Loading training data from GitHub...")
             df_pelatihan = pd.read_excel(
-                GITHUB_TRAINING_URL, 
-                sheet_name="Versi Ringkas Untuk Tesis"
-            )
+                GITHUB_TRAINING_URL) #, 
+                # sheet_name="Versi Ringkas Untuk Tesis")
             df_pelatihan = fill_missing_pelatihan(df_pelatihan)
             data_store.df_pelatihan = df_pelatihan
             print(f"  ✓ Loaded {len(df_pelatihan)} training programs")
@@ -78,9 +77,8 @@ def load_from_github(load_type):
         if load_type in ['both', 'jobs']:
             print(f"Loading job data from GitHub...")
             df_lowongan = pd.read_excel(
-                GITHUB_JOBS_URL, 
-                sheet_name="petakan ke KBJI"
-            )
+                GITHUB_JOBS_URL) #, 
+                # sheet_name="petakan ke KBJI")
             data_store.df_lowongan = df_lowongan
             print(f"  ✓ Loaded {len(df_lowongan)} job positions")
         
@@ -210,10 +208,10 @@ def process_training_file(file):
     """Process uploaded training file"""
     try:
         # Read Excel file directly from file stream
-        df = pd.read_excel(file, sheet_name="Versi Ringkas Untuk Tesis")
+        df = pd.read_excel(file) #, sheet_name="Versi Ringkas Untuk Tesis")
         
         # Validate required columns
-        required_columns = ['PROGRAM PELATIHAN', 'Tujuan/Kompetensi', 'Deskripsi Program']
+        required_columns = ['PROGRAM PELATIHAN', 'Tujuan/Kompetensi'] #, 'Deskripsi Program']
         missing_columns = [col for col in required_columns if col not in df.columns]
         
         if missing_columns:
@@ -235,7 +233,7 @@ def process_job_file(file):
     """Process uploaded job file"""
     try:
         # Read Excel file directly from file stream
-        df = pd.read_excel(file, sheet_name="petakan ke KBJI")
+        df = pd.read_excel(file) #, sheet_name="petakan ke KBJI")
         
         # Validate required columns
         required_columns = ['Nama Jabatan', 'Deskripsi KBJI', 'Kompetensi']

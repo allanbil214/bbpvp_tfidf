@@ -73,8 +73,8 @@ class BBPVPMatchingGUI:
         self.total_saved_sample = 5
         
         # GitHub URLs
-        self.github_training_url = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/2.%20data%20bersih%20Program%20Pelatihan%20Tahun.xlsx"
-        self.github_jobs_url = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/3%20.%20databersih-%20Rekap%20Surat%20Masuk%20dan%20Lowongan%202025.xlsx"
+        self.github_training_url = "https://github.com/robarade-dev/tesisadenin/raw/refs/heads/main/dataprogrampelatihan.xlsx"
+        self.github_jobs_url = "https://github.com/robarade-dev/tesisadenin/raw/refs/heads/main/datalowonganpekerjaan.xlsx"
         
         # Indonesian stopwords
         self.stopwords = {
@@ -1150,8 +1150,8 @@ class BBPVPMatchingGUI:
                 # Load Training Data
                 self.log_message("\n[1/2] Loading Training Data (Pelatihan)...")
                 self.log_message(f"URL: {self.github_training_url}")
-                self.df_pelatihan = pd.read_excel(self.github_training_url, 
-                                                 sheet_name="Versi Ringkas Untuk Tesis")
+                self.df_pelatihan = pd.read_excel(self.github_training_url) #, 
+                                                 #sheet_name="Versi Ringkas Untuk Tesis")
                 self.log_message(f"✓ Training Data loaded: {self.df_pelatihan.shape[0]} rows, "
                                f"{self.df_pelatihan.shape[1]} columns")
                 
@@ -1161,8 +1161,8 @@ class BBPVPMatchingGUI:
                 # Load Job Data
                 self.log_message("\n[2/2] Loading Job Data (Lowongan)...")
                 self.log_message(f"URL: {self.github_jobs_url}")
-                self.df_lowongan = pd.read_excel(self.github_jobs_url, 
-                                                sheet_name="petakan ke KBJI")
+                self.df_lowongan = pd.read_excel(self.github_jobs_url) #, 
+                                                #sheet_name="petakan ke KBJI")
                 self.log_message(f"✓ Job Data loaded: {self.df_lowongan.shape[0]} rows, "
                                f"{self.df_lowongan.shape[1]} columns")
                 
@@ -1198,7 +1198,7 @@ class BBPVPMatchingGUI:
                 messagebox.showerror("Error", f"Failed to load data:\n{str(e)}")
         
         threading.Thread(target=load, daemon=True).start()
-    
+  
     def load_training_data(self):
         self.import_status.delete(1.0, tk.END)
         self.log_message("Loading Training Data (Pelatihan)...")
@@ -1207,8 +1207,8 @@ class BBPVPMatchingGUI:
             try:
                 if self.data_source_var.get() == "github":
                     self.log_message(f"Fetching from GitHub...")
-                    self.df_pelatihan = pd.read_excel(self.github_training_url, 
-                                                     sheet_name="Versi Ringkas Untuk Tesis")
+                    self.df_pelatihan = pd.read_excel(self.github_training_url) #, 
+                                                     # sheet_name="Versi Ringkas Untuk Tesis")
                 else:
                     filename = filedialog.askopenfilename(
                         title="Select Training Data File",
@@ -1216,8 +1216,8 @@ class BBPVPMatchingGUI:
                     )
                     if filename:
                         self.log_message(f"Loading from: {filename}")
-                        self.df_pelatihan = pd.read_excel(filename, 
-                                                         sheet_name="Versi Ringkas Untuk Tesis")
+                        self.df_pelatihan = pd.read_excel(filename) #, 
+                                                         # sheet_name="Versi Ringkas Untuk Tesis")
                     else:
                         self.log_message("No file selected.")
                         return
@@ -1244,8 +1244,8 @@ class BBPVPMatchingGUI:
             try:
                 if self.data_source_var.get() == "github":
                     self.log_message(f"Fetching from GitHub...")
-                    self.df_lowongan = pd.read_excel(self.github_jobs_url, 
-                                                    sheet_name="petakan ke KBJI")
+                    self.df_lowongan = pd.read_excel(self.github_jobs_url) #, 
+                                                    # sheet_name="petakan ke KBJI")
                 else:
                     filename = filedialog.askopenfilename(
                         title="Select Job Data File",
@@ -1253,8 +1253,8 @@ class BBPVPMatchingGUI:
                     )
                     if filename:
                         self.log_message(f"Loading from: {filename}")
-                        self.df_lowongan = pd.read_excel(filename, 
-                                                        sheet_name="petakan ke KBJI")
+                        self.df_lowongan = pd.read_excel(filename) #, 
+                                                        # sheet_name="petakan ke KBJI")
                     else:
                         self.log_message("No file selected.")
                         return
@@ -1432,14 +1432,14 @@ class BBPVPMatchingGUI:
                 return f"Setelah mengikuti pelatihan ini peserta kompeten dalam melaksanakan pekerjaan {program.lower()} sesuai standar dan SOP di tempat kerja."
             return row['Tujuan/Kompetensi']
         
-        def fill_deskripsi(row):
-            if pd.isna(row['Deskripsi Program']) or str(row['Deskripsi Program']).strip() == '':
-                program = row['PROGRAM PELATIHAN'].strip()
-                return f"Pelatihan ini adalah pelatihan untuk melaksanakan pekerjaan {program.lower()} sesuai standar dan SOP di tempat kerja."
-            return row['Deskripsi Program']
+        # def fill_deskripsi(row):
+        #     if pd.isna(row['Deskripsi Program']) or str(row['Deskripsi Program']).strip() == '':
+        #         program = row['PROGRAM PELATIHAN'].strip()
+        #         return f"Pelatihan ini adalah pelatihan untuk melaksanakan pekerjaan {program.lower()} sesuai standar dan SOP di tempat kerja."
+        #     return row['Deskripsi Program']
         
         self.df_pelatihan['Tujuan/Kompetensi'] = self.df_pelatihan.apply(fill_tujuan, axis=1)
-        self.df_pelatihan['Deskripsi Program'] = self.df_pelatihan.apply(fill_deskripsi, axis=1)
+        # self.df_pelatihan['Deskripsi Program'] = self.df_pelatihan.apply(fill_deskripsi, axis=1)
         self.log_message("✓ Missing values filled")
 
     def expand_synonyms(self, text):

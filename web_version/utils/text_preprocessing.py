@@ -52,14 +52,14 @@ def fill_missing_pelatihan(df):
             return f"Setelah mengikuti pelatihan ini peserta kompeten dalam melaksanakan pekerjaan {program.lower()} sesuai standar dan SOP di tempat kerja."
         return row['Tujuan/Kompetensi']
     
-    def fill_deskripsi(row):
-        if pd.isna(row['Deskripsi Program']) or str(row['Deskripsi Program']).strip() == '':
-            program = row['PROGRAM PELATIHAN'].strip()
-            return f"Pelatihan ini adalah pelatihan untuk melaksanakan pekerjaan {program.lower()} sesuai standar dan SOP di tempat kerja."
-        return row['Deskripsi Program']
+    # def fill_deskripsi(row):
+    #     if pd.isna(row['Deskripsi Program']) or str(row['Deskripsi Program']).strip() == '':
+    #         program = row['PROGRAM PELATIHAN'].strip()
+    #         return f"Pelatihan ini adalah pelatihan untuk melaksanakan pekerjaan {program.lower()} sesuai standar dan SOP di tempat kerja."
+    #     return row['Deskripsi Program']
     
     df['Tujuan/Kompetensi'] = df.apply(fill_tujuan, axis=1)
-    df['Deskripsi Program'] = df.apply(fill_deskripsi, axis=1)
+    # df['Deskripsi Program'] = df.apply(fill_deskripsi, axis=1)
     return df
 
 def preprocess_dataframe(df, dataset_type='training'):

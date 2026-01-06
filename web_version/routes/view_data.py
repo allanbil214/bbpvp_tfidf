@@ -31,7 +31,7 @@ def api_get_data():
                 return jsonify({'success': False, 'message': 'Training data not loaded'})
             
             # Get columns to display
-            display_columns = ['PROGRAM PELATIHAN', 'Tujuan/Kompetensi', 'Deskripsi Program']
+            display_columns = ['PROGRAM PELATIHAN', 'Tujuan/Kompetensi'] #, 'Deskripsi Program']
             
         else:  # job
             df = data_store.df_lowongan
@@ -134,7 +134,7 @@ def api_search_data():
         
         if dataset_type == 'training':
             df = data_store.df_pelatihan
-            search_columns = ['PROGRAM PELATIHAN', 'Tujuan/Kompetensi', 'Deskripsi Program']
+            search_columns = ['PROGRAM PELATIHAN', 'Tujuan/Kompetensi'] #, 'Deskripsi Program']
         else:
             df = data_store.df_lowongan
             search_columns = ['Nama Jabatan', 'Deskripsi KBJI', 'Kompetensi']
