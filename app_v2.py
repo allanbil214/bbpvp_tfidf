@@ -2083,19 +2083,19 @@ class BBPVPMatchingGUI:
             
             for rank, pel_idx in enumerate(top_3_indices, 1):
                 pelatihan_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
-                sim_score = similarities[pel_idx]
+                similarity = similarities[pel_idx]
                 
                 # Determine match level
-                if sim_score >= 0.80:
+                if similarity >= 0.80:
                     match_level = "excellent"
                     match_emoji = "🟢"
-                elif sim_score >= 0.65:
+                elif similarity >= 0.65:
                     match_level = "very_good"
                     match_emoji = "🟢"
-                elif sim_score >= 0.50:
+                elif similarity >= 0.50:
                     match_level = "good"
                     match_emoji = "🟡"
-                elif sim_score >= 0.35:
+                elif similarity >= 0.35:
                     match_level = "fair"
                     match_emoji = "🟡"
                 else:
@@ -2107,7 +2107,7 @@ class BBPVPMatchingGUI:
                 program_display = pelatihan_name[:51] + ".." if len(pelatihan_name) > 53 else pelatihan_name
                 
                 self.log_message(
-                    f"│ {low_idx:<4} │ {job_display:<43} │ {program_display:<53} │ {rank:<4} │ {sim_score:<11.8f} │ {sim_score*100:<8.2f} │ {match_emoji} {match_level:<8} │",
+                    f"│ {low_idx:<4} │ {job_display:<43} │ {program_display:<53} │ {rank:<4} │ {similarity:<11.8f} │ {similarity*100:<8.2f} │ {match_emoji} {match_level:<8} │",
                     self.tfidf_output
                 )
         
@@ -2612,20 +2612,20 @@ class BBPVPMatchingGUI:
             
             for rank, pel_idx in enumerate(filtered_indices, 1):
                 program_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
-                sim_score = similarities[pel_idx]
+                similarity = similarities[pel_idx]
                 
                 # Determine match level
                 # Determine match level using self.match_thresholds
-                if sim_score >= self.match_thresholds['excellent']:
+                if similarity >= self.match_thresholds['excellent']:
                     match_level = "excellent"
                     match_emoji = "🟢"
-                elif sim_score >= self.match_thresholds['very_good']:
+                elif similarity >= self.match_thresholds['very_good']:
                     match_level = "very_good"
                     match_emoji = "🟢"
-                elif sim_score >= self.match_thresholds['good']:
+                elif similarity >= self.match_thresholds['good']:
                     match_level = "good"
                     match_emoji = "🟡"
-                elif sim_score >= self.match_thresholds['fair']:
+                elif similarity >= self.match_thresholds['fair']:
                     match_level = "fair"
                     match_emoji = "🟡"
                 else:
