@@ -15,11 +15,14 @@ from sklearn.metrics.pairwise import cosine_similarity
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import io
+import os
 import threading
 import mysql.connector
 from mysql.connector import Error
 import json
 from datetime import datetime
+import pickle
+import hashlib
 
 # Try to import Sastrawi, provide fallback if not available
 try:
@@ -65,6 +68,11 @@ class BBPVPMatchingGUI:
         self.db_connection = None
         self.current_experiment_id = None
         self.connect_to_database()
+        self.cache_dir = "cache"
+        os.makedirs(self.cache_dir, exist_ok=True)
+
+        self.progress_var = tk.DoubleVar()
+        self.progress_label_var = tk.StringVar()
 
         # Data storage
         self.df_pelatihan = None
@@ -134,7 +142,72 @@ class BBPVPMatchingGUI:
             }
         }
         self.create_widgets()
+
+    def get_cache_key(self, df, dataset_type):
+        """Generate cache key based on dataset content"""
+        # Create hash from dataset content
+        content = f"{dataset_type}_{len(df)}"
+        for idx in range(min(5, len(df))):  # Sample first 5 rows for hash
+            row = df.iloc[idx]
+            if dataset_type == 'pelatihan':
+                content += str(row.get('Tujuan/Kompetensi', ''))
+            else:
+                content += str(row.get('Deskripsi KBJI', ''))
         
+        return hashlib.md5(content.encode()).hexdigest()
+    
+    def load_from_cache(self, cache_key):
+        """Load preprocessed data from cache"""
+        cache_file = os.path.join(self.cache_dir, f"{cache_key}.pkl")
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, 'rb') as f:
+                    return pickle.load(f)
+            except Exception as e:
+                print(f"Cache load error: {e}")
+                return None
+        return None
+    
+    def save_to_cache(self, cache_key, data):
+        """Save preprocessed data to cache"""
+        cache_file = os.path.join(self.cache_dir, f"{cache_key}.pkl")
+        try:
+            with open(cache_file, 'wb') as f:
+                pickle.dump(data, f)
+            return True
+        except Exception as e:
+            print(f"Cache save error: {e}")
+            return False
+
+    def show_progress_bar(self, parent_widget):
+        """Show progress bar in the output widget"""
+        self.progress_label_var.set("Processing...")
+        parent_widget.insert(tk.END, "\n")
+        
+    def update_progress(self, current, total, message, parent_widget):
+        """Update progress bar on the same line"""
+        percentage = (current / total) * 100 if total > 0 else 0
+        
+        # Create a simple text-based progress bar
+        bar_length = 50
+        filled = int(bar_length * current / total) if total > 0 else 0
+        bar = '█' * filled + '░' * (bar_length - filled)
+        
+        # Get current content
+        content = parent_widget.get(1.0, tk.END)
+        # lines = content.rstrip('\n').split('\n')
+        
+        # # Check if last line is a progress bar (starts with '[')
+        # if lines and lines[-1].startswith('['):
+        #     # Remove the last line (old progress bar)
+        #     parent_widget.delete(f"{len(lines)}.0", tk.END)
+        
+        # Insert new progress bar
+        progress_line = f"[{bar}] {percentage:.1f}% - {message} ({current}/{total})\n"
+        parent_widget.insert(tk.END, progress_line)
+        parent_widget.see(tk.END)
+        self.root.update()
+
     def create_widgets(self):
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill='both', expand=True, padx=5, pady=5)
@@ -359,11 +432,58 @@ class BBPVPMatchingGUI:
         main_frame = ttk.Frame(parent, padding="10")
         main_frame.pack(fill='both', expand=True)
         
-        # Left panel - Controls (fixed width)
-        left_frame = ttk.Frame(main_frame, width=350)
-        left_frame.pack(side='left', fill='y', padx=(0, 10))
-        left_frame.pack_propagate(False)
+        # Left panel - Controls (fixed width) with scrollbar
+        left_container = ttk.Frame(main_frame, width=350)
+        left_container.pack(side='left', fill='y', padx=(0, 10))
+        left_container.pack_propagate(False)
         
+        # Get the background color from the current theme
+        style = ttk.Style()
+        bg_color = style.lookup('TFrame', 'background')
+        
+        # Create canvas and scrollbar
+        left_canvas = tk.Canvas(left_container, width=350, bg=bg_color, highlightthickness=0)
+        left_scrollbar = ttk.Scrollbar(left_container, orient="vertical", command=left_canvas.yview)
+        
+        # Create frame inside canvas
+        left_frame = ttk.Frame(left_canvas)
+        
+        # Configure canvas
+        left_canvas.configure(yscrollcommand=left_scrollbar.set)
+        
+        # Pack scrollbar and canvas
+        left_scrollbar.pack(side="right", fill="y")
+        left_canvas.pack(side="left", fill="both", expand=True)
+        
+        # Create window in canvas
+        canvas_frame = left_canvas.create_window((0, 0), window=left_frame, anchor="nw")
+        
+        # Configure scroll region
+        def configure_scroll_region(event):
+            left_canvas.configure(scrollregion=left_canvas.bbox("all"))
+        
+        left_frame.bind("<Configure>", configure_scroll_region)
+        
+        # Configure canvas window width
+        def configure_canvas_width(event):
+            left_canvas.itemconfig(canvas_frame, width=event.width)
+        
+        left_canvas.bind("<Configure>", configure_canvas_width)
+        
+        # Mouse wheel scrolling
+        def on_mousewheel(event):
+            left_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def bind_mousewheel(event):
+            left_canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        def unbind_mousewheel(event):
+            left_canvas.unbind_all("<MouseWheel>")
+        
+        left_canvas.bind("<Enter>", bind_mousewheel)
+        left_canvas.bind("<Leave>", unbind_mousewheel)
+        
+        # Now add all your content to left_frame
         title = ttk.Label(left_frame, text="View Data", font=('Arial', 14, 'bold'))
         title.pack(pady=10)
         
@@ -431,11 +551,58 @@ class BBPVPMatchingGUI:
         main_frame = ttk.Frame(parent, padding="10")
         main_frame.pack(fill='both', expand=True)
         
-        # Left panel - Controls (fixed width)
-        left_frame = ttk.Frame(main_frame, width=350)
-        left_frame.pack(side='left', fill='y', padx=(0, 10))
-        left_frame.pack_propagate(False)  # Prevent shrinking
+        # Left panel - Controls (fixed width) with scrollbar
+        left_container = ttk.Frame(main_frame, width=350)
+        left_container.pack(side='left', fill='y', padx=(0, 10))
+        left_container.pack_propagate(False)
         
+        # Get the background color from the current theme
+        style = ttk.Style()
+        bg_color = style.lookup('TFrame', 'background')
+        
+        # Create canvas and scrollbar
+        left_canvas = tk.Canvas(left_container, width=350, bg=bg_color, highlightthickness=0)
+        left_scrollbar = ttk.Scrollbar(left_container, orient="vertical", command=left_canvas.yview)
+        
+        # Create frame inside canvas
+        left_frame = ttk.Frame(left_canvas)
+        
+        # Configure canvas
+        left_canvas.configure(yscrollcommand=left_scrollbar.set)
+        
+        # Pack scrollbar and canvas
+        left_scrollbar.pack(side="right", fill="y")
+        left_canvas.pack(side="left", fill="both", expand=True)
+        
+        # Create window in canvas
+        canvas_frame = left_canvas.create_window((0, 0), window=left_frame, anchor="nw")
+        
+        # Configure scroll region
+        def configure_scroll_region(event):
+            left_canvas.configure(scrollregion=left_canvas.bbox("all"))
+        
+        left_frame.bind("<Configure>", configure_scroll_region)
+        
+        # Configure canvas window width
+        def configure_canvas_width(event):
+            left_canvas.itemconfig(canvas_frame, width=event.width)
+        
+        left_canvas.bind("<Configure>", configure_canvas_width)
+        
+        # Mouse wheel scrolling
+        def on_mousewheel(event):
+            left_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def bind_mousewheel(event):
+            left_canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        def unbind_mousewheel(event):
+            left_canvas.unbind_all("<MouseWheel>")
+        
+        left_canvas.bind("<Enter>", bind_mousewheel)
+        left_canvas.bind("<Leave>", unbind_mousewheel)
+        
+        # Now add all your content to left_frame
         title = ttk.Label(left_frame, text="Preprocessing Steps", font=('Arial', 14, 'bold'))
         title.pack(pady=10)
         
@@ -445,9 +612,9 @@ class BBPVPMatchingGUI:
         
         self.dataset_var = tk.StringVar(value="pelatihan")
         ttk.Radiobutton(dataset_frame, text="Training Programs", 
-                       variable=self.dataset_var, value="pelatihan").pack(anchor='w', pady=3)
+                    variable=self.dataset_var, value="pelatihan").pack(anchor='w', pady=3)
         ttk.Radiobutton(dataset_frame, text="Job Positions", 
-                       variable=self.dataset_var, value="lowongan").pack(anchor='w', pady=3)
+                    variable=self.dataset_var, value="lowongan").pack(anchor='w', pady=3)
         
         # Row selection
         row_frame = ttk.LabelFrame(left_frame, text="Select Row", padding="10")
@@ -473,36 +640,83 @@ class BBPVPMatchingGUI:
         
         for step_name, step_num in steps:
             ttk.Button(steps_frame, text=step_name, 
-                      command=lambda s=step_num: self.show_preprocessing_step(s),
-                      width=28).pack(pady=2)
+                    command=lambda s=step_num: self.show_preprocessing_step(s),
+                    width=28).pack(pady=2)
         
         # Process all button
         ttk.Separator(left_frame, orient='horizontal').pack(fill='x', pady=10)
         ttk.Button(left_frame, text="▶ Process All Data", 
-                  command=self.process_all_data,
-                  style='Accent.TButton', width=28).pack(pady=10)
+                command=self.process_all_data,
+                style='Accent.TButton', width=28).pack(pady=10)
         
         # Right panel - Display
         right_frame = ttk.Frame(main_frame)
         right_frame.pack(side='left', fill='both', expand=True)
         
         ttk.Label(right_frame, text="Preprocessing Output", 
-                 font=('Arial', 12, 'bold')).pack(pady=5)
+                font=('Arial', 12, 'bold')).pack(pady=5)
         
         self.preprocess_output = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, 
-                                                           font=('Consolas', 9))
+                                                        font=('Consolas', 9))
         self.preprocess_output.pack(fill='both', expand=True)
-
+        
     def create_tfidf_tab(self, parent):
         # Main frame with left-right layout
         main_frame = ttk.Frame(parent, padding="10")
         main_frame.pack(fill='both', expand=True)
         
-        # Left panel - Controls (fixed width)
-        left_frame = ttk.Frame(main_frame, width=380)
-        left_frame.pack(side='left', fill='y', padx=(0, 10))
-        left_frame.pack_propagate(False)
+        # Left panel - Controls (fixed width) with scrollbar
+        left_container = ttk.Frame(main_frame, width=380)
+        left_container.pack(side='left', fill='y', padx=(0, 10))
+        left_container.pack_propagate(False)
         
+        # Get the background color from the current theme
+        style = ttk.Style()
+        bg_color = style.lookup('TFrame', 'background')
+        
+        # Create canvas and scrollbar
+        left_canvas = tk.Canvas(left_container, width=380, bg=bg_color, highlightthickness=0)
+        left_scrollbar = ttk.Scrollbar(left_container, orient="vertical", command=left_canvas.yview)
+        
+        # Create frame inside canvas
+        left_frame = ttk.Frame(left_canvas)
+        
+        # Configure canvas
+        left_canvas.configure(yscrollcommand=left_scrollbar.set)
+        
+        # Pack scrollbar and canvas
+        left_scrollbar.pack(side="right", fill="y")
+        left_canvas.pack(side="left", fill="both", expand=True)
+        
+        # Create window in canvas
+        canvas_frame = left_canvas.create_window((0, 0), window=left_frame, anchor="nw")
+        
+        # Configure scroll region
+        def configure_scroll_region(event):
+            left_canvas.configure(scrollregion=left_canvas.bbox("all"))
+        
+        left_frame.bind("<Configure>", configure_scroll_region)
+        
+        # Configure canvas window width
+        def configure_canvas_width(event):
+            left_canvas.itemconfig(canvas_frame, width=event.width)
+        
+        left_canvas.bind("<Configure>", configure_canvas_width)
+        
+        # Mouse wheel scrolling
+        def on_mousewheel(event):
+            left_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def bind_mousewheel(event):
+            left_canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        def unbind_mousewheel(event):
+            left_canvas.unbind_all("<MouseWheel>")
+        
+        left_canvas.bind("<Enter>", bind_mousewheel)
+        left_canvas.bind("<Leave>", unbind_mousewheel)
+        
+        # Now add all your content to left_frame
         title = ttk.Label(left_frame, text="TF-IDF & Similarity", font=('Arial', 14, 'bold'))
         title.pack(pady=10)
         
@@ -511,7 +725,7 @@ class BBPVPMatchingGUI:
         doc_frame.pack(fill='x', pady=10)
         
         ttk.Button(doc_frame, text="Load Document Options", 
-                  command=self.load_document_options, width=30).pack(pady=5)
+                command=self.load_document_options, width=30).pack(pady=5)
 
         ttk.Label(doc_frame, text="Training Program:").pack(anchor='w', pady=2)
         self.pelatihan_combo = ttk.Combobox(doc_frame, state='readonly', width=35)
@@ -536,29 +750,29 @@ class BBPVPMatchingGUI:
         
         for step_name, command in steps:
             ttk.Button(step_frame, text=step_name, command=command, 
-                      width=30).pack(pady=2)
+                    width=30).pack(pady=2)
         
         ttk.Separator(step_frame, orient='horizontal').pack(fill='x', pady=8)
         
         ttk.Button(step_frame, text="▶ Run All Steps", 
-                  command=self.run_all_tfidf_steps,
-                  style='Accent.TButton', width=30).pack(pady=5)
+                command=self.run_all_tfidf_steps,
+                style='Accent.TButton', width=30).pack(pady=5)
         
         # Calculate all button
         ttk.Separator(left_frame, orient='horizontal').pack(fill='x', pady=10)
         ttk.Button(left_frame, text="Calculate All Documents\n(Full Similarity Matrix)", 
-                  command=self.calculate_all_documents,
-                  style='Accent.TButton', width=30).pack(pady=10)
+                command=self.calculate_all_documents,
+                style='Accent.TButton', width=30).pack(pady=10)
         
         # Right panel - Output
         right_frame = ttk.Frame(main_frame)
         right_frame.pack(side='left', fill='both', expand=True)
         
         ttk.Label(right_frame, text="TF-IDF Calculation Output", 
-                 font=('Arial', 12, 'bold')).pack(pady=5)
+                font=('Arial', 12, 'bold')).pack(pady=5)
         
         self.tfidf_output = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, 
-                                                      font=('Consolas', 9))
+                                                    font=('Consolas', 9))
         self.tfidf_output.pack(fill='both', expand=True)
 
     def create_recommendations_tab(self, parent):
@@ -566,54 +780,87 @@ class BBPVPMatchingGUI:
         main_frame = ttk.Frame(parent, padding="10")
         main_frame.pack(fill='both', expand=True)
         
-        # Left panel - Controls (fixed width)
-        left_frame = ttk.Frame(main_frame, width=400)
-        left_frame.pack(side='left', fill='y', padx=(0, 10))
-        left_frame.pack_propagate(False)
+        # Left panel with scrollbar
+        left_container = ttk.Frame(main_frame, width=420)
+        left_container.pack(side='left', fill='y', padx=(0, 10))
+        left_container.pack_propagate(False)
         
+        # Get the background color from the current theme
+        style = ttk.Style()
+        bg_color = style.lookup('TFrame', 'background')
+        
+        # Create canvas and scrollbar
+        left_canvas = tk.Canvas(left_container, width=400, bg=bg_color, highlightthickness=0)
+        left_scrollbar = ttk.Scrollbar(left_container, orient="vertical", command=left_canvas.yview)
+        
+        # Create frame inside canvas
+        left_frame = ttk.Frame(left_canvas)
+        
+        # Configure canvas
+        left_canvas.configure(yscrollcommand=left_scrollbar.set)
+        
+        # Pack scrollbar and canvas
+        left_scrollbar.pack(side="right", fill="y")
+        left_canvas.pack(side="left", fill="both", expand=True)
+        
+        # Create window in canvas
+        canvas_frame = left_canvas.create_window((0, 0), window=left_frame, anchor="nw")
+        
+        # Configure scroll region
+        def configure_scroll_region(event):
+            left_canvas.configure(scrollregion=left_canvas.bbox("all"))
+        
+        left_frame.bind("<Configure>", configure_scroll_region)
+        
+        # Configure canvas window width
+        def configure_canvas_width(event):
+            left_canvas.itemconfig(canvas_frame, width=event.width)
+        
+        left_canvas.bind("<Configure>", configure_canvas_width)
+        
+        # Mouse wheel scrolling
+        def on_mousewheel(event):
+            left_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def bind_mousewheel(event):
+            left_canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        def unbind_mousewheel(event):
+            left_canvas.unbind_all("<MouseWheel>")
+        
+        left_canvas.bind("<Enter>", bind_mousewheel)
+        left_canvas.bind("<Leave>", unbind_mousewheel)
+        
+        # Now add all your content to left_frame (not left_container)
         title = ttk.Label(left_frame, text="Recommendations", font=('Arial', 14, 'bold'))
         title.pack(pady=10)
         
-        # Option 1: Single Job
-        single_frame = ttk.LabelFrame(left_frame, text="Option 1: Single Job", padding="10")
-        single_frame.pack(fill='x', pady=10)
-
-        ttk.Label(single_frame, text="Select Job Position:").pack(anchor='w', pady=3)
-        self.rec_job_combo = ttk.Combobox(single_frame, state='readonly', width=35)
-        self.rec_job_combo.pack(fill='x', pady=5)
-
-        ttk.Label(single_frame, text="Number of Recommendations:").pack(anchor='w', pady=3)
-        self.rec_count_spinbox = ttk.Spinbox(single_frame, from_=1, to=20, width=15)
-        self.rec_count_spinbox.set(5)
-        self.rec_count_spinbox.pack(anchor='w', pady=5)
-
-        # Add Minimum Similarity for Single Job
-        ttk.Label(single_frame, text="Minimum Similarity:").pack(anchor='w', pady=3)
-        threshold_single_frame = ttk.Frame(single_frame)
-        threshold_single_frame.pack(fill='x', pady=5)
-
-        self.rec_single_threshold_var = tk.DoubleVar(value=0.01)
-        self.rec_single_threshold_scale = ttk.Scale(threshold_single_frame, from_=0.0, to=1.0, 
-                                            variable=self.rec_single_threshold_var, 
-                                            orient='horizontal')
-        self.rec_single_threshold_scale.pack(side='left', fill='x', expand=True)
-        self.rec_single_threshold_label = ttk.Label(threshold_single_frame, text="", width=6)
-        self.rec_single_threshold_label.pack(side='right', padx=5)
-
-        def update_single_threshold_label(*args):
-            self.rec_single_threshold_label.config(text=f"{self.rec_single_threshold_var.get():.2f}")
-        self.rec_single_threshold_var.trace('w', update_single_threshold_label)
-        update_single_threshold_label()  # Initialize
-
-        ttk.Button(single_frame, text="Get Recommendations", 
-                command=self.show_single_job_recommendations,
-                style='Accent.TButton', width=30).pack(pady=10)                
+        # Recommendation Mode Selection
+        mode_frame = ttk.LabelFrame(left_frame, text="Recommendation Mode", padding="10")
+        mode_frame.pack(fill='x', pady=10, padx=5)
         
-        # Option 2: All Jobs
-        all_frame = ttk.LabelFrame(left_frame, text="Option 2: All Jobs", padding="10")
-        all_frame.pack(fill='x', pady=10)
+        self.rec_mode_var = tk.StringVar(value="by_job")
         
-        ttk.Label(all_frame, text="Top N per job:").pack(anchor='w', pady=3)
+        ttk.Radiobutton(mode_frame, text="By Job Position (Jobs → Training)", 
+                    variable=self.rec_mode_var, value="by_job",
+                    command=self.update_recommendation_display).pack(anchor='w', pady=3)
+        ttk.Radiobutton(mode_frame, text="By Training Program (Training → Jobs)", 
+                    variable=self.rec_mode_var, value="by_training",
+                    command=self.update_recommendation_display).pack(anchor='w', pady=3)
+        
+        # Single Selection Frame (will change based on mode)
+        self.single_frame = ttk.LabelFrame(left_frame, text="Single Selection", padding="10")
+        self.single_frame.pack(fill='x', pady=10, padx=5)
+        
+        # Container for dynamic content
+        self.single_content_frame = ttk.Frame(self.single_frame)
+        self.single_content_frame.pack(fill='x')
+        
+        # All Selection Frame
+        all_frame = ttk.LabelFrame(left_frame, text="All Items", padding="10")
+        all_frame.pack(fill='x', pady=10, padx=5)
+        
+        ttk.Label(all_frame, text="Top N per item:").pack(anchor='w', pady=3)
         self.rec_all_count_spinbox = ttk.Spinbox(all_frame, from_=1, to=10, width=15)
         self.rec_all_count_spinbox.set(3)
         self.rec_all_count_spinbox.pack(anchor='w', pady=5)
@@ -633,16 +880,15 @@ class BBPVPMatchingGUI:
         def update_threshold_label(*args):
             self.rec_threshold_label.config(text=f"{self.rec_threshold_var.get():.2f}")
         self.rec_threshold_var.trace('w', update_threshold_label)
-        
         update_threshold_label()  
 
         ttk.Button(all_frame, text="Get All Recommendations", 
-                command=self.show_all_jobs_recommendations,
+                command=self.show_all_recommendations,
                 style='Accent.TButton', width=30).pack(pady=10)
         
         # Export buttons
         export_frame = ttk.LabelFrame(left_frame, text="Export Results", padding="10")
-        export_frame.pack(fill='x', pady=10)
+        export_frame.pack(fill='x', pady=10, padx=5)
         
         ttk.Button(export_frame, text="📊 Export to Excel", 
                 command=self.export_recommendations_excel,
@@ -652,13 +898,14 @@ class BBPVPMatchingGUI:
                 width=30).pack(pady=3)
         
         # Info
-        info_text = tk.Text(left_frame, height=4, wrap=tk.WORD, font=('Arial', 8))
-        info_text.pack(fill='x', pady=10)
+        info_text = tk.Text(left_frame, height=5, wrap=tk.WORD, font=('Arial', 8))
+        info_text.pack(fill='x', pady=10, padx=5)
         info_text.insert(1.0, 
             "💡 Make sure to:\n"
             "1. Import data (Tab 1)\n"
-            "2. Preprocess (Tab 2)\n"
-            "3. Calculate similarity (Tab 3)"
+            "2. Preprocess (Tab 3)\n"
+            "3. Calculate similarity (Tab 4)\n"
+            "4. Choose recommendation mode"
         )
         info_text.config(state='disabled')
         
@@ -667,11 +914,122 @@ class BBPVPMatchingGUI:
         right_frame.pack(side='left', fill='both', expand=True)
         
         ttk.Label(right_frame, text="Recommendation Results", 
-                 font=('Arial', 12, 'bold')).pack(pady=5)
+                font=('Arial', 12, 'bold')).pack(pady=5)
         
         self.rec_output = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, 
                                                     font=('Consolas', 9))
         self.rec_output.pack(fill='both', expand=True)
+        
+        # Initial display
+        self.update_recommendation_display()
+        
+    def update_recommendation_display(self):
+        """Update the recommendation display based on selected mode"""
+        # Clear current content
+        for widget in self.single_content_frame.winfo_children():
+            widget.destroy()
+        
+        mode = self.rec_mode_var.get()
+        
+        if mode == "by_job":
+            # Job mode
+            self.single_frame.config(text="Single Job Position")
+            
+            ttk.Label(self.single_content_frame, text="Select Job Position:").pack(anchor='w', pady=3)
+            self.rec_job_combo = ttk.Combobox(self.single_content_frame, state='readonly', width=35)
+            self.rec_job_combo.pack(fill='x', pady=5)
+            
+            ttk.Label(self.single_content_frame, text="Number of Recommendations:").pack(anchor='w', pady=3)
+            self.rec_count_spinbox = ttk.Spinbox(self.single_content_frame, from_=1, to=20, width=15)
+            self.rec_count_spinbox.set(5)
+            self.rec_count_spinbox.pack(anchor='w', pady=5)
+            
+            ttk.Label(self.single_content_frame, text="Minimum Similarity:").pack(anchor='w', pady=3)
+            threshold_frame = ttk.Frame(self.single_content_frame)
+            threshold_frame.pack(fill='x', pady=5)
+            
+            self.rec_single_threshold_var = tk.DoubleVar(value=0.01)
+            self.rec_single_threshold_scale = ttk.Scale(threshold_frame, from_=0.0, to=1.0, 
+                                                variable=self.rec_single_threshold_var, 
+                                                orient='horizontal')
+            self.rec_single_threshold_scale.pack(side='left', fill='x', expand=True)
+            self.rec_single_threshold_label = ttk.Label(threshold_frame, text="0.01", width=6)
+            self.rec_single_threshold_label.pack(side='right', padx=5)
+            
+            def update_label(*args):
+                self.rec_single_threshold_label.config(text=f"{self.rec_single_threshold_var.get():.2f}")
+            self.rec_single_threshold_var.trace('w', update_label)
+            
+            ttk.Button(self.single_content_frame, text="Get Recommendations", 
+                    command=self.show_single_recommendation,
+                    style='Accent.TButton', width=30).pack(pady=10)
+            
+            # Load job options
+            if self.df_lowongan is not None:
+                job_options = [f"{i}: {row['Nama Jabatan']}" 
+                            for i, row in self.df_lowongan.iterrows()]
+                self.rec_job_combo['values'] = job_options
+                if job_options:
+                    self.rec_job_combo.current(0)
+        
+        else:  # by_training
+            # Training mode
+            self.single_frame.config(text="Single Training Program")
+            
+            ttk.Label(self.single_content_frame, text="Select Training Program:").pack(anchor='w', pady=3)
+            self.rec_training_combo = ttk.Combobox(self.single_content_frame, state='readonly', width=35)
+            self.rec_training_combo.pack(fill='x', pady=5)
+            
+            ttk.Label(self.single_content_frame, text="Number of Recommendations:").pack(anchor='w', pady=3)
+            self.rec_training_count_spinbox = ttk.Spinbox(self.single_content_frame, from_=1, to=20, width=15)
+            self.rec_training_count_spinbox.set(5)
+            self.rec_training_count_spinbox.pack(anchor='w', pady=5)
+            
+            ttk.Label(self.single_content_frame, text="Minimum Similarity:").pack(anchor='w', pady=3)
+            threshold_frame = ttk.Frame(self.single_content_frame)
+            threshold_frame.pack(fill='x', pady=5)
+            
+            self.rec_training_threshold_var = tk.DoubleVar(value=0.01)
+            self.rec_training_threshold_scale = ttk.Scale(threshold_frame, from_=0.0, to=1.0, 
+                                                variable=self.rec_training_threshold_var, 
+                                                orient='horizontal')
+            self.rec_training_threshold_scale.pack(side='left', fill='x', expand=True)
+            self.rec_training_threshold_label = ttk.Label(threshold_frame, text="0.01", width=6)
+            self.rec_training_threshold_label.pack(side='right', padx=5)
+            
+            def update_label(*args):
+                self.rec_training_threshold_label.config(text=f"{self.rec_training_threshold_var.get():.2f}")
+            self.rec_training_threshold_var.trace('w', update_label)
+            
+            ttk.Button(self.single_content_frame, text="Get Recommendations", 
+                    command=self.show_single_recommendation,
+                    style='Accent.TButton', width=30).pack(pady=10)
+            
+            # Load training options
+            if self.df_pelatihan is not None:
+                training_options = [f"{i}: {row['PROGRAM PELATIHAN']}" 
+                            for i, row in self.df_pelatihan.iterrows()]
+                self.rec_training_combo['values'] = training_options
+                if training_options:
+                    self.rec_training_combo.current(0)
+
+    def show_single_recommendation(self):
+        """Show single recommendation based on current mode"""
+        mode = self.rec_mode_var.get()
+        
+        if mode == "by_job":
+            self.show_single_job_recommendations()
+        else:
+            self.show_single_training_recommendations()
+
+    def show_all_recommendations(self):
+        """Show all recommendations based on current mode"""
+        mode = self.rec_mode_var.get()
+        
+        if mode == "by_job":
+            self.show_all_jobs_recommendations()
+        else:
+            self.show_all_trainings_recommendations()
 
     def create_settings_tab(self, parent):
         """Create settings tab for threshold configuration"""
@@ -679,11 +1037,58 @@ class BBPVPMatchingGUI:
         main_frame = ttk.Frame(parent, padding="10")
         main_frame.pack(fill='both', expand=True)
         
-        # Left panel - Controls (fixed width)
-        left_frame = ttk.Frame(main_frame, width=450)
-        left_frame.pack(side='left', fill='y', padx=(0, 10))
-        left_frame.pack_propagate(False)
+        # Left panel - Controls (fixed width) with scrollbar
+        left_container = ttk.Frame(main_frame, width=450)
+        left_container.pack(side='left', fill='y', padx=(0, 10))
+        left_container.pack_propagate(False)
         
+        # Get the background color from the current theme
+        style = ttk.Style()
+        bg_color = style.lookup('TFrame', 'background')
+        
+        # Create canvas and scrollbar
+        left_canvas = tk.Canvas(left_container, width=450, bg=bg_color, highlightthickness=0)
+        left_scrollbar = ttk.Scrollbar(left_container, orient="vertical", command=left_canvas.yview)
+        
+        # Create frame inside canvas
+        left_frame = ttk.Frame(left_canvas)
+        
+        # Configure canvas
+        left_canvas.configure(yscrollcommand=left_scrollbar.set)
+        
+        # Pack scrollbar and canvas
+        left_scrollbar.pack(side="right", fill="y")
+        left_canvas.pack(side="left", fill="both", expand=True)
+        
+        # Create window in canvas
+        canvas_frame = left_canvas.create_window((0, 0), window=left_frame, anchor="nw")
+        
+        # Configure scroll region
+        def configure_scroll_region(event):
+            left_canvas.configure(scrollregion=left_canvas.bbox("all"))
+        
+        left_frame.bind("<Configure>", configure_scroll_region)
+        
+        # Configure canvas window width
+        def configure_canvas_width(event):
+            left_canvas.itemconfig(canvas_frame, width=event.width)
+        
+        left_canvas.bind("<Configure>", configure_canvas_width)
+        
+        # Mouse wheel scrolling
+        def on_mousewheel(event):
+            left_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def bind_mousewheel(event):
+            left_canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        def unbind_mousewheel(event):
+            left_canvas.unbind_all("<MouseWheel>")
+        
+        left_canvas.bind("<Enter>", bind_mousewheel)
+        left_canvas.bind("<Leave>", unbind_mousewheel)
+        
+        # Now add all your content to left_frame
         title = ttk.Label(left_frame, text="Match Level Settings", font=('Arial', 14, 'bold'))
         title.pack(pady=10)
         
@@ -1136,8 +1541,8 @@ class BBPVPMatchingGUI:
         """Load both training and job data at once"""
         if self.data_source_var.get() != "github":
             messagebox.showinfo("Info", 
-                              "Load Both Data option is only available for GitHub source.\n"
-                              "Please select 'Load from GitHub' or load files individually.")
+                            "Load Both Data option is only available for GitHub source.\n"
+                            "Please select 'Load from GitHub' or load files individually.")
             return
         
         self.import_status.delete(1.0, tk.END)
@@ -1148,45 +1553,45 @@ class BBPVPMatchingGUI:
         def load():
             try:
                 # Load Training Data
-                self.log_message("\n[1/2] Loading Training Data (Pelatihan)...")
-                self.log_message(f"URL: {self.github_training_url}")
-                self.df_pelatihan = pd.read_excel(self.github_training_url) #, 
-                                                 #sheet_name="Versi Ringkas Untuk Tesis")
+                self.log_message("\n[1/2] Loading Training Data (Pelatihan)...", self.import_status)
+                self.update_progress(1, 2, "Loading training data", self.import_status)
+                self.log_message(f"URL: {self.github_training_url}", self.import_status)
+                self.df_pelatihan = pd.read_excel(self.github_training_url)
                 self.log_message(f"✓ Training Data loaded: {self.df_pelatihan.shape[0]} rows, "
-                               f"{self.df_pelatihan.shape[1]} columns")
+                            f"{self.df_pelatihan.shape[1]} columns", self.import_status)
                 
                 # Fill missing values
                 self.fill_missing_pelatihan()
                 
                 # Load Job Data
-                self.log_message("\n[2/2] Loading Job Data (Lowongan)...")
-                self.log_message(f"URL: {self.github_jobs_url}")
-                self.df_lowongan = pd.read_excel(self.github_jobs_url) #, 
-                                                #sheet_name="petakan ke KBJI")
+                self.log_message("\n[2/2] Loading Job Data (Lowongan)...", self.import_status)
+                self.update_progress(2, 2, "Loading job data", self.import_status)
+                self.log_message(f"URL: {self.github_jobs_url}", self.import_status)
+                self.df_lowongan = pd.read_excel(self.github_jobs_url)
                 self.log_message(f"✓ Job Data loaded: {self.df_lowongan.shape[0]} rows, "
-                               f"{self.df_lowongan.shape[1]} columns")
+                            f"{self.df_lowongan.shape[1]} columns", self.import_status)
                 
                 # Summary
-                self.log_message("\n" + "=" * 80)
-                self.log_message("✓ BOTH DATASETS LOADED SUCCESSFULLY!")
-                self.log_message("=" * 80)
-                self.log_message(f"\n📊 Summary:")
-                self.log_message(f"  • Training Programs: {len(self.df_pelatihan)} records")
-                self.log_message(f"  • Job Positions: {len(self.df_lowongan)} records")
-                self.log_message(f"  • Total: {len(self.df_pelatihan) + len(self.df_lowongan)} records")
+                self.log_message("\n" + "=" * 80, self.import_status)
+                self.log_message("✓ BOTH DATASETS LOADED SUCCESSFULLY!", self.import_status)
+                self.log_message("=" * 80, self.import_status)
+                self.log_message(f"\n📊 Summary:", self.import_status)
+                self.log_message(f"  • Training Programs: {len(self.df_pelatihan)} records", self.import_status)
+                self.log_message(f"  • Job Positions: {len(self.df_lowongan)} records", self.import_status)
+                self.log_message(f"  • Total: {len(self.df_pelatihan) + len(self.df_lowongan)} records", self.import_status)
                 
-                self.log_message(f"\n📋 Training Data Columns:")
-                self.log_message(f"  {', '.join(self.df_pelatihan.columns.tolist())}")
+                self.log_message(f"\n📋 Training Data Columns:", self.import_status)
+                self.log_message(f"  {', '.join(self.df_pelatihan.columns.tolist())}", self.import_status)
                 
-                self.log_message(f"\n📋 Job Data Columns:")
-                self.log_message(f"  {', '.join(self.df_lowongan.columns.tolist())}")
+                self.log_message(f"\n📋 Job Data Columns:", self.import_status)
+                self.log_message(f"  {', '.join(self.df_lowongan.columns.tolist())}", self.import_status)
                 
-                self.log_message(f"\n✨ Ready for preprocessing! Go to 'Preprocessing' tab.")
+                self.log_message(f"\n✨ Ready for preprocessing! Go to 'Preprocessing' tab.", self.import_status)
                 
                 messagebox.showinfo("Success", 
-                                  f"Both datasets loaded successfully!\n\n"
-                                  f"Training: {len(self.df_pelatihan)} records\n"
-                                  f"Jobs: {len(self.df_lowongan)} records")
+                                f"Both datasets loaded successfully!\n\n"
+                                f"Training: {len(self.df_pelatihan)} records\n"
+                                f"Jobs: {len(self.df_lowongan)} records")
                 
                 self.create_experiment(
                     "Data Import Session",
@@ -1194,11 +1599,11 @@ class BBPVPMatchingGUI:
                 )
 
             except Exception as e:
-                self.log_message(f"\n✗ Error: {str(e)}")
+                self.log_message(f"\n✗ Error: {str(e)}", self.import_status)
                 messagebox.showerror("Error", f"Failed to load data:\n{str(e)}")
         
         threading.Thread(target=load, daemon=True).start()
-  
+
     def load_training_data(self):
         self.import_status.delete(1.0, tk.END)
         self.log_message("Loading Training Data (Pelatihan)...")
@@ -1282,12 +1687,23 @@ class BBPVPMatchingGUI:
                 self.log_message("❌ Please load training data first!", self.view_output)
                 return
             title = "TRAINING PROGRAMS DATA - TABLE VIEW"
+            # Select only the columns you want to display
+            display_columns = ['NO', 'PROGRAM PELATIHAN', 'DURASI JP (@45 Menit)', 'Tujuan/Kompetensi']
         else:
             df = self.df_lowongan
             if df is None:
                 self.log_message("❌ Please load job data first!", self.view_output)
                 return
             title = "JOB POSITIONS DATA - TABLE VIEW"
+            # Select only the columns you want to display for jobs
+            display_columns = ['NO', 'Nama Jabatan', 'Deskripsi KBJI']
+        
+        # Filter to only existing columns
+        columns = [col for col in display_columns if col in df.columns]
+        
+        if not columns:
+            self.log_message("❌ No matching columns found in dataset!", self.view_output)
+            return
         
         try:
             n_records = int(self.view_records_spinbox.get())
@@ -1301,10 +1717,7 @@ class BBPVPMatchingGUI:
         self.log_message(title, self.view_output)
         self.log_message("=" * 150, self.view_output)
         self.log_message(f"\n📊 Total records: {len(df)} | Showing: {n_records} records", self.view_output)
-        self.log_message(f"📋 Total columns: {len(df.columns)}\n", self.view_output)
-        
-        # Get all column names
-        columns = df.columns.tolist()
+        self.log_message(f"📋 Displaying columns: {len(columns)}\n", self.view_output)
         
         # Create table header
         self.log_message("=" * 150, self.view_output)
@@ -1343,7 +1756,7 @@ class BBPVPMatchingGUI:
         self.log_message(f"{'=' * 150}", self.view_output)
         
         # Show column list
-        self.log_message(f"\n📋 Column Names ({len(columns)} total):", self.view_output)
+        self.log_message(f"\n📋 Displayed Columns ({len(columns)}):", self.view_output)
         for i, col in enumerate(columns, 1):
             self.log_message(f"  {i}. {col}", self.view_output)
 
@@ -1359,12 +1772,23 @@ class BBPVPMatchingGUI:
                 self.log_message("❌ Please load training data first!", self.view_output)
                 return
             title = "TRAINING PROGRAMS DATA - LIST VIEW"
+            # Select only the columns you want to display
+            display_columns = ['NO', 'PROGRAM PELATIHAN', 'DURASI JP (@45 Menit)', 'Tujuan/Kompetensi']
         else:
             df = self.df_lowongan
             if df is None:
                 self.log_message("❌ Please load job data first!", self.view_output)
                 return
             title = "JOB POSITIONS DATA - LIST VIEW"
+            # Select only the columns you want to display for jobs
+            display_columns = ['NO', 'Nama Jabatan', 'Deskripsi KBJI']
+        
+        # Filter to only existing columns
+        columns = [col for col in display_columns if col in df.columns]
+        
+        if not columns:
+            self.log_message("❌ No matching columns found in dataset!", self.view_output)
+            return
         
         try:
             n_records = int(self.view_records_spinbox.get())
@@ -1378,10 +1802,7 @@ class BBPVPMatchingGUI:
         self.log_message(title, self.view_output)
         self.log_message("=" * 120, self.view_output)
         self.log_message(f"\n📊 Total records: {len(df)} | Showing: {n_records} records", self.view_output)
-        self.log_message(f"📋 Total columns: {len(df.columns)}\n", self.view_output)
-        
-        # Get all column names
-        columns = df.columns.tolist()
+        self.log_message(f"📋 Displaying columns: {len(columns)}\n", self.view_output)
         
         # Display each record with all columns
         for idx in range(n_records):
@@ -1420,9 +1841,9 @@ class BBPVPMatchingGUI:
         self.log_message(f"{'=' * 120}", self.view_output)
         
         # Show column summary
-        self.log_message(f"\n📋 All Columns ({len(columns)} total):", self.view_output)
+        self.log_message(f"\n📋 Displayed Columns ({len(columns)}):", self.view_output)
         for i, col in enumerate(columns, 1):
-            self.log_message(f"  {i:2d}. {col}", self.view_output)
+            self.log_message(f"  {i:2d}. {col}", self.view_output)       
 
     def fill_missing_pelatihan(self):
         """Fill missing values in training data"""
@@ -1988,10 +2409,10 @@ class BBPVPMatchingGUI:
                                 "Please run preprocessing again.")
             return
         
-        # Existing code continues...
         self.tfidf_output.delete(1.0, tk.END)
-        self.log_message("Calculating similarity matrix for all documents...", self.tfidf_output)
-        self.log_message("This may take a moment...\n", self.tfidf_output)
+        self.log_message("=" * 80, self.tfidf_output)
+        self.log_message("CALCULATING SIMILARITY MATRIX", self.tfidf_output)
+        self.log_message("=" * 80, self.tfidf_output)
         
         # Use sklearn for full matrix (more efficient for many documents)
         from sklearn.feature_extraction.text import TfidfVectorizer
@@ -2004,14 +2425,17 @@ class BBPVPMatchingGUI:
         # Calculate TF-IDF
         vectorizer = TfidfVectorizer()
         tfidf_matrix = vectorizer.fit_transform(all_texts)
+        self.log_message("✓ TF-IDF vectors created\n", self.tfidf_output)
         
         # Split back
         n_pelatihan = len(self.df_pelatihan)
         pelatihan_vectors = tfidf_matrix[:n_pelatihan]
         lowongan_vectors = tfidf_matrix[n_pelatihan:]
         
+        self.log_message("Step 2/3: Calculating cosine similarities...", self.tfidf_output)
         # Calculate similarity matrix
         similarity_matrix = cosine_similarity(pelatihan_vectors, lowongan_vectors)
+        self.log_message("✓ Similarity matrix calculated\n", self.tfidf_output)
         
         # Display results
         self.log_message("=" * 150, self.tfidf_output)
@@ -2034,7 +2458,6 @@ class BBPVPMatchingGUI:
         self.log_message(f"   • Maximum Similarity: {max_similarity:.4f} ({max_similarity*100:.2f}%)", self.tfidf_output)
         self.log_message(f"   • Minimum Similarity: {min_similarity:.4f} ({min_similarity*100:.2f}%)", self.tfidf_output)
         
-        # Count by match levels
         # Count by match levels using self.match_thresholds
         excellent = np.sum(similarity_matrix >= self.match_thresholds['excellent'])
         very_good = np.sum((similarity_matrix >= self.match_thresholds['very_good']) & 
@@ -2053,7 +2476,8 @@ class BBPVPMatchingGUI:
         self.log_message(f"   • 🔴 Weak (<{self.match_thresholds['fair']*100:.0f}%): {weak} pairs ({weak/similarity_matrix.size*100:.1f}%)", self.tfidf_output)     
 
         # Top matches for each job - SQL TABLE FORMAT
-        self.log_message("\n\n" + "=" * 150, self.tfidf_output)
+        self.log_message("\n\nStep 3/3: Generating top matches table...", self.tfidf_output)
+        self.log_message("\n" + "=" * 150, self.tfidf_output)
         self.log_message("TOP 3 TRAINING PROGRAMS FOR EACH JOB POSITION", self.tfidf_output)
         self.log_message("=" * 150, self.tfidf_output)
         
@@ -2075,8 +2499,9 @@ class BBPVPMatchingGUI:
             self.tfidf_output
         )
         
-        # Process each job
-        for low_idx in range(len(self.df_lowongan)):
+        # Process each job with progress
+        total_jobs = len(self.df_lowongan)
+        for low_idx in range(total_jobs):
             lowongan_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan']
             similarities = similarity_matrix[:, low_idx]
             top_3_indices = np.argsort(similarities)[-3:][::-1]
@@ -2086,16 +2511,16 @@ class BBPVPMatchingGUI:
                 similarity = similarities[pel_idx]
                 
                 # Determine match level
-                if similarity >= 0.80:
+                if similarity >= self.match_thresholds['excellent']:
                     match_level = "excellent"
                     match_emoji = "🟢"
-                elif similarity >= 0.65:
+                elif similarity >= self.match_thresholds['very_good']:
                     match_level = "very_good"
                     match_emoji = "🟢"
-                elif similarity >= 0.50:
+                elif similarity >= self.match_thresholds['good']:
                     match_level = "good"
                     match_emoji = "🟡"
-                elif similarity >= 0.35:
+                elif similarity >= self.match_thresholds['fair']:
                     match_level = "fair"
                     match_emoji = "🟡"
                 else:
@@ -2110,7 +2535,7 @@ class BBPVPMatchingGUI:
                     f"│ {low_idx:<4} │ {job_display:<43} │ {program_display:<53} │ {rank:<4} │ {similarity:<11.8f} │ {similarity*100:<8.2f} │ {match_emoji} {match_level:<8} │",
                     self.tfidf_output
                 )
-        
+
         # Table footer
         self.log_message(
             f"└{'─' * 6}┴{'─' * 45}┴{'─' * 55}┴{'─' * 6}┴{'─' * 13}┴{'─' * 10}┴{'─' * 12}┘",
@@ -2148,7 +2573,7 @@ class BBPVPMatchingGUI:
                 similarities[top_pel_idx]
             )
         
-        self.log_message(f"✓ Saved {sample_count} TF-IDF calculation samples", self.tfidf_output)
+        self.log_message(f"\n✓ Saved {sample_count} TF-IDF calculation samples", self.tfidf_output)
 
     def show_preprocessing_step(self, step):
         """Show specific preprocessing step for selected row"""
@@ -2304,9 +2729,9 @@ class BBPVPMatchingGUI:
                 self.log_message(f"\nStemmed text: {stemmed_text[:150]}...", self.preprocess_output)
                 self.log_message(f"\nFinal tokens: {stemmed_tokens[:15]}...", self.preprocess_output)
                 self.log_message(f"Total: {len(stemmed_tokens)} tokens", self.preprocess_output)
-                    
+
     def process_all_data(self):
-        """Process all data through all preprocessing steps"""
+        """Process all data through all preprocessing steps with caching"""
         self.preprocess_output.delete(1.0, tk.END)
         self.log_message("Processing all data...", self.preprocess_output)
         
@@ -2315,114 +2740,474 @@ class BBPVPMatchingGUI:
             if self.df_pelatihan is not None:
                 self.log_message("\n" + "=" * 80, self.preprocess_output)
                 self.log_message("PROCESSING TRAINING DATA (PELATIHAN)", self.preprocess_output)
-                self.log_message("=" * 80, self.preprocess_output)
+                self.log_message("=" * 80 + "\n", self.preprocess_output)
                 
-                # Combine text features
-                self.df_pelatihan['text_features'] = (
-                    # self.df_pelatihan['PROGRAM PELATIHAN'].fillna('') + ' ' +
-                    self.df_pelatihan['Tujuan/Kompetensi'].fillna('') 
-                    # + ' ' +
-                    # self.df_pelatihan['Deskripsi Program'].fillna('')
-                )
+                # Generate cache key
+                cache_key = f"training_{self.get_cache_key(self.df_pelatihan, 'pelatihan')}"
                 
-                # Apply preprocessing
-                self.df_pelatihan['normalized'] = self.df_pelatihan['text_features'].apply(
-                    self.normalize_text)
-                self.log_message("✓ Normalization completed", self.preprocess_output)
+                # Try to load from cache
+                self.log_message("Checking cache...", self.preprocess_output)
+                cached_data = self.load_from_cache(cache_key)
                 
-                self.df_pelatihan['no_stopwords'] = self.df_pelatihan['normalized'].apply(
-                    self.remove_stopwords)
-                self.log_message("✓ Stopword removal completed", self.preprocess_output)
+                if cached_data is not None:
+                    self.log_message("Cache found! Loading preprocessed data...", self.preprocess_output)
+                    # Restore cached columns
+                    for col in ['text_features', 'normalized', 'no_stopwords', 'tokens', 
+                               'stemmed_tokens', 'stemmed', 'token_count', 'preprocessed_text']:
+                        if col in cached_data:
+                            self.df_pelatihan[col] = cached_data[col]
+                    self.log_message(f"Loaded {len(self.df_pelatihan)} training programs from cache\n", 
+                                self.preprocess_output)
+                else:
+                    self.log_message("No cache found. Processing from scratch...\n", self.preprocess_output)
+                    
+                    # Combine text features
+                    self.df_pelatihan['text_features'] = (
+                        self.df_pelatihan['Tujuan/Kompetensi'].fillna('')
+                    )
+                    
+                    # Apply preprocessing
+                    self.log_message("Step 1/5: Normalizing...", self.preprocess_output)
+                    self.df_pelatihan['normalized'] = self.df_pelatihan['text_features'].apply(
+                        self.normalize_text)
+                    self.log_message("Normalization completed\n", self.preprocess_output)
+                    
+                    self.log_message("Step 2/5: Removing stopwords...", self.preprocess_output)
+                    self.df_pelatihan['no_stopwords'] = self.df_pelatihan['normalized'].apply(
+                        self.remove_stopwords)
+                    self.log_message("Stopword removal completed\n", self.preprocess_output)
+                    
+                    self.log_message("Step 3/5: Tokenizing...", self.preprocess_output)
+                    self.df_pelatihan['tokens'] = self.df_pelatihan['no_stopwords'].apply(
+                        self.tokenize_text)
+                    self.log_message("Tokenization completed\n", self.preprocess_output)
+                    
+                    self.log_message("Step 4/5: Stemming (per token) - this may take a while...", self.preprocess_output)
+                    
+                    # Progress bar for stemming
+                    stemmed_tokens_list = []
+                    for idx, tokens in enumerate(self.df_pelatihan['tokens']):
+                        stemmed = self.stem_tokens(tokens)
+                        stemmed_tokens_list.append(stemmed)
+                        
+                        if idx % 10 == 0 or idx == len(self.df_pelatihan) - 1:
+                            self.update_progress(idx + 1, len(self.df_pelatihan), 
+                                            "Stemming training data", self.preprocess_output)
+                    
+                    self.df_pelatihan['stemmed_tokens'] = stemmed_tokens_list
+                    self.log_message("\nStemming (per token) completed\n", self.preprocess_output)
+                    
+                    self.log_message("Step 5/5: Finalizing...", self.preprocess_output)
+                    self.df_pelatihan['stemmed'] = self.df_pelatihan['stemmed_tokens'].apply(
+                        lambda x: ' '.join(x))
+                    self.df_pelatihan['token_count'] = self.df_pelatihan['stemmed_tokens'].apply(len)
+                    self.df_pelatihan['preprocessed_text'] = self.df_pelatihan['stemmed']
+                    
+                    # Save to cache
+                    self.log_message("Saving to cache for future use...", self.preprocess_output)
+                    cache_data = {
+                        'text_features': self.df_pelatihan['text_features'],
+                        'normalized': self.df_pelatihan['normalized'],
+                        'no_stopwords': self.df_pelatihan['no_stopwords'],
+                        'tokens': self.df_pelatihan['tokens'],
+                        'stemmed_tokens': self.df_pelatihan['stemmed_tokens'],
+                        'stemmed': self.df_pelatihan['stemmed'],
+                        'token_count': self.df_pelatihan['token_count'],
+                        'preprocessed_text': self.df_pelatihan['preprocessed_text']
+                    }
+                    if self.save_to_cache(cache_key, cache_data):
+                        self.log_message("Cache saved successfully\n", self.preprocess_output)
+                    
+                    self.log_message(f"Processed {len(self.df_pelatihan)} training programs", 
+                                self.preprocess_output)
                 
-                self.df_pelatihan['tokens'] = self.df_pelatihan['no_stopwords'].apply(
-                    self.tokenize_text)
-                self.log_message("✓ Tokenization completed", self.preprocess_output)
-                
-                self.df_pelatihan['stemmed_tokens'] = self.df_pelatihan['tokens'].apply(
-                    self.stem_tokens)
-                self.log_message("✓ Stemming (per token) completed", self.preprocess_output)
-                
-                self.df_pelatihan['stemmed'] = self.df_pelatihan['stemmed_tokens'].apply(
-                    lambda x: ' '.join(x))
-                self.df_pelatihan['token_count'] = self.df_pelatihan['stemmed_tokens'].apply(len)
-                self.df_pelatihan['preprocessed_text'] = self.df_pelatihan['stemmed']
-                
-                self.log_message(f"\n✓ Processed {len(self.df_pelatihan)} training programs", 
-                               self.preprocess_output)
-                self.log_message(f"Average tokens: {self.df_pelatihan['token_count'].mean():.1f}", 
-                               self.preprocess_output)
+                self.log_message(f"Average tokens: {self.df_pelatihan['token_count'].mean():.1f}\n", 
+                            self.preprocess_output)
             
-            # Process Job Data
+            # Process Job Data (similar structure)
             if self.df_lowongan is not None:
                 self.log_message("\n" + "=" * 80, self.preprocess_output)
                 self.log_message("PROCESSING JOB DATA (LOWONGAN)", self.preprocess_output)
-                self.log_message("=" * 80, self.preprocess_output)
+                self.log_message("=" * 80 + "\n", self.preprocess_output)
                 
-                # Combine text features
-                self.df_lowongan['text_features'] = (
-                    # self.df_lowongan['Nama Jabatan'].fillna('') + ' ' +
-                    # self.df_lowongan['Nama KBJI Resmi'].fillna('') + ' ' +
-                    self.df_lowongan['Deskripsi KBJI'].fillna('') 
-                    # + ' ' +
-                    # self.df_lowongan['Kompetensi'].fillna('')
-                )
+                # Generate cache key
+                cache_key = f"job_{self.get_cache_key(self.df_lowongan, 'lowongan')}"
                 
-                # Apply preprocessing
-                self.df_lowongan['normalized'] = self.df_lowongan['text_features'].apply(
-                    self.normalize_text)
-                self.log_message("✓ Normalization completed", self.preprocess_output)
+                # Try to load from cache
+                self.log_message("Checking cache...", self.preprocess_output)
+                cached_data = self.load_from_cache(cache_key)
                 
-                self.df_lowongan['no_stopwords'] = self.df_lowongan['normalized'].apply(
-                    self.remove_stopwords)
-                self.log_message("✓ Stopword removal completed", self.preprocess_output)
+                if cached_data is not None:
+                    self.log_message("Cache found! Loading preprocessed data...", self.preprocess_output)
+                    # Restore cached columns
+                    for col in ['text_features', 'normalized', 'no_stopwords', 'tokens', 
+                               'stemmed_tokens', 'stemmed', 'token_count', 'preprocessed_text']:
+                        if col in cached_data:
+                            self.df_lowongan[col] = cached_data[col]
+                    self.log_message(f"Loaded {len(self.df_lowongan)} job positions from cache\n", 
+                                self.preprocess_output)
+                else:
+                    self.log_message("No cache found. Processing from scratch...\n", self.preprocess_output)
+                    
+                    # Combine text features
+                    self.df_lowongan['text_features'] = (
+                        self.df_lowongan['Deskripsi KBJI'].fillna('')
+                    )
+                    
+                    # Apply preprocessing
+                    self.log_message("Step 1/5: Normalizing...", self.preprocess_output)
+                    self.df_lowongan['normalized'] = self.df_lowongan['text_features'].apply(
+                        self.normalize_text)
+                    self.log_message("Normalization completed\n", self.preprocess_output)
+                    
+                    self.log_message("Step 2/5: Removing stopwords...", self.preprocess_output)
+                    self.df_lowongan['no_stopwords'] = self.df_lowongan['normalized'].apply(
+                        self.remove_stopwords)
+                    self.log_message("Stopword removal completed\n", self.preprocess_output)
+                    
+                    self.log_message("Step 3/5: Tokenizing...", self.preprocess_output)
+                    self.df_lowongan['tokens'] = self.df_lowongan['no_stopwords'].apply(
+                        self.tokenize_text)
+                    self.log_message("Tokenization completed\n", self.preprocess_output)
+                    
+                    self.log_message("Step 4/5: Stemming (per token) - this may take a while...", self.preprocess_output)
+                    
+                    # Progress bar for stemming
+                    stemmed_tokens_list = []
+                    for idx, tokens in enumerate(self.df_lowongan['tokens']):
+                        stemmed = self.stem_tokens(tokens)
+                        stemmed_tokens_list.append(stemmed)
+                        
+                        if idx % 10 == 0 or idx == len(self.df_lowongan) - 1:
+                            self.update_progress(idx + 1, len(self.df_lowongan), 
+                                            "Stemming job data", self.preprocess_output)
+                    
+                    self.df_lowongan['stemmed_tokens'] = stemmed_tokens_list
+                    self.log_message("\nStemming (per token) completed\n", self.preprocess_output)
+                    
+                    self.log_message("Step 5/5: Finalizing...", self.preprocess_output)
+                    self.df_lowongan['stemmed'] = self.df_lowongan['stemmed_tokens'].apply(
+                        lambda x: ' '.join(x))
+                    self.df_lowongan['token_count'] = self.df_lowongan['stemmed_tokens'].apply(len)
+                    self.df_lowongan['preprocessed_text'] = self.df_lowongan['stemmed']
+                    
+                    # Save to cache
+                    self.log_message("Saving to cache for future use...", self.preprocess_output)
+                    cache_data = {
+                        'text_features': self.df_lowongan['text_features'],
+                        'normalized': self.df_lowongan['normalized'],
+                        'no_stopwords': self.df_lowongan['no_stopwords'],
+                        'tokens': self.df_lowongan['tokens'],
+                        'stemmed_tokens': self.df_lowongan['stemmed_tokens'],
+                        'stemmed': self.df_lowongan['stemmed'],
+                        'token_count': self.df_lowongan['token_count'],
+                        'preprocessed_text': self.df_lowongan['preprocessed_text']
+                    }
+                    if self.save_to_cache(cache_key, cache_data):
+                        self.log_message("Cache saved successfully\n", self.preprocess_output)
+                    
+                    self.log_message(f"Processed {len(self.df_lowongan)} job positions", 
+                                self.preprocess_output)
                 
-                self.df_lowongan['tokens'] = self.df_lowongan['no_stopwords'].apply(
-                    self.tokenize_text)
-                self.log_message("✓ Tokenization completed", self.preprocess_output)
-                
-                self.df_lowongan['stemmed_tokens'] = self.df_lowongan['tokens'].apply(
-                    self.stem_tokens)
-                self.log_message("✓ Stemming (per token) completed", self.preprocess_output)
-                
-                self.df_lowongan['stemmed'] = self.df_lowongan['stemmed_tokens'].apply(
-                    lambda x: ' '.join(x))
-                self.df_lowongan['token_count'] = self.df_lowongan['stemmed_tokens'].apply(len)
-                self.df_lowongan['preprocessed_text'] = self.df_lowongan['stemmed']
-                
-                self.log_message(f"\n✓ Processed {len(self.df_lowongan)} job positions", 
-                               self.preprocess_output)
-                self.log_message(f"Average tokens: {self.df_lowongan['token_count'].mean():.1f}", 
-                               self.preprocess_output)
+                self.log_message(f"Average tokens: {self.df_lowongan['token_count'].mean():.1f}\n", 
+                            self.preprocess_output)
             
             self.log_message("\n" + "=" * 80, self.preprocess_output)
             self.log_message("ALL DATA PROCESSING COMPLETED!", self.preprocess_output)
             self.log_message("=" * 80, self.preprocess_output)
-            # self.log_message("\nYou can now view statistics in the 'Results & Analysis' tab.", 
-            #                self.preprocess_output)
         
             if self.df_pelatihan is not None:
-                # Save samples for thesis based on self.total_saved_sample variable
+                self.log_message("\nSaving preprocessing samples...", self.preprocess_output)
                 for idx in range(min(self.total_saved_sample, len(self.df_pelatihan))):
                     self.save_preprocessing_sample('training', idx, self.df_pelatihan.iloc[idx])
+                    self.update_progress(idx + 1, self.total_saved_sample, 
+                                    "Saving training samples", self.preprocess_output)
 
             if self.df_lowongan is not None:
+                self.log_message("\n", self.preprocess_output)
                 for idx in range(min(self.total_saved_sample, len(self.df_lowongan))):
                     self.save_preprocessing_sample('job', idx, self.df_lowongan.iloc[idx])
+                    self.update_progress(idx + 1, self.total_saved_sample, 
+                                    "Saving job samples", self.preprocess_output)
 
-            self.log_message("✓ Preprocessing samples saved to database", self.preprocess_output)
-
+            self.log_message("\n✓ Preprocessing samples saved to database", self.preprocess_output)
         threading.Thread(target=process, daemon=True).start()
 
     def load_recommendation_options(self):
         """Load job options for recommendations"""
-        if self.df_lowongan is None:
+        success_job = False
+        success_training = False
+        
+        if self.df_lowongan is not None:
+            job_options = [f"{i}: {row['Nama Jabatan']}" 
+                        for i, row in self.df_lowongan.iterrows()]
+            self.rec_job_combo['values'] = job_options
+            if job_options:
+                self.rec_job_combo.current(0)
+            success_job = True
+        
+        if self.df_pelatihan is not None:
+            training_options = [f"{i}: {row['PROGRAM PELATIHAN']}" 
+                        for i, row in self.df_pelatihan.iterrows()]
+            self.rec_training_combo['values'] = training_options
+            if training_options:
+                self.rec_training_combo.current(0)
+            success_training = True
+        
+        return success_job or success_training
+
+    def show_all_trainings_recommendations(self):
+        """Show recommendations for all training programs"""
+        self.rec_output.delete(1.0, tk.END)
+        
+        # Check if data is ready
+        if not hasattr(self, 'similarity_matrix') or self.similarity_matrix is None:
+            messagebox.showwarning("Warning", 
+                                "Please calculate similarity matrix first!\n"
+                                "Go to 'TF-IDF & Cosine Similarity' tab and click "
+                                "'Calculate All Documents'")
+            return
+        
+        try:
+            n_recommendations = int(self.rec_all_count_spinbox.get())
+            threshold = float(self.rec_threshold_var.get())
+        except:
+            messagebox.showerror("Error", "Invalid parameters!")
+            return
+        
+        # Display header
+        self.log_message("=" * 150, self.rec_output)
+        self.log_message("JOB POSITION RECOMMENDATIONS - ALL TRAINING PROGRAMS", self.rec_output)
+        self.log_message("=" * 150, self.rec_output)
+        self.log_message(f"\n📊 Configuration: Top N = {n_recommendations} per training | Threshold = {threshold:.2f} | Training = {len(self.df_pelatihan)} | Jobs = {len(self.df_lowongan)}", self.rec_output)
+        
+        # Store all recommendations for export
+        self.all_recommendations = []
+        
+        # SQL-style table header
+        self.log_message("\n" + "=" * 150, self.rec_output)
+        self.log_message(
+            f"┌{'─' * 8}┬{'─' * 50}┬{'─' * 50}┬{'─' * 6}┬{'─' * 13}┬{'─' * 10}┬{'─' * 12}┐",
+            self.rec_output
+        )
+        self.log_message(
+            f"│ {'Train':<6} │ {'Training Program':<48} │ {'Recommended Job Position':<48} │ {'Rank':<4} │ {'Similarity':<11} │ {'Score %':<8} │ {'Match':<10} │",
+            self.rec_output
+        )
+        self.log_message(
+            f"│ {'Idx':<6} │ {'':<48} │ {'':<48} │ {'':<4} │ {'Score':<11} │ {'':<8} │ {'Level':<10} │",
+            self.rec_output
+        )
+        self.log_message(
+            f"├{'─' * 8}┼{'─' * 50}┼{'─' * 50}┼{'─' * 6}┼{'─' * 13}┼{'─' * 10}┼{'─' * 12}┤",
+            self.rec_output
+        )
+        
+        # Process each training program
+        for training_idx in range(len(self.df_pelatihan)):
+            training_name = self.df_pelatihan.iloc[training_idx]['PROGRAM PELATIHAN']
+            similarities = self.similarity_matrix[training_idx, :]
+            
+            # Get top N that meet threshold
+            top_indices = np.argsort(similarities)[::-1]
+            filtered_indices = [idx for idx in top_indices 
+                            if similarities[idx] >= threshold][:n_recommendations]
+            
+            if not filtered_indices:
+                continue
+            
+            for rank, job_idx in enumerate(filtered_indices, 1):
+                job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan']
+                similarity = similarities[job_idx]
+                
+                # Determine match level
+                if similarity >= self.match_thresholds['excellent']:
+                    match_level = "excellent"
+                    match_emoji = "🟢"
+                elif similarity >= self.match_thresholds['very_good']:
+                    match_level = "very_good"
+                    match_emoji = "🟢"
+                elif similarity >= self.match_thresholds['good']:
+                    match_level = "good"
+                    match_emoji = "🟡"
+                elif similarity >= self.match_thresholds['fair']:
+                    match_level = "fair"
+                    match_emoji = "🟡"
+                else:
+                    match_level = "weak"
+                    match_emoji = "🔴"
+                
+                # Truncate names if too long
+                training_display = training_name[:46] + ".." if len(training_name) > 48 else training_name
+                job_display = job_name[:46] + ".." if len(job_name) > 48 else job_name
+                
+                self.log_message(
+                    f"│ {training_idx:<6} │ {training_display:<48} │ {job_display:<48} │ {rank:<4} │ {similarity:<11.8f} │ {similarity*100:<8.2f} │ {match_emoji} {match_level:<8} │",
+                    self.rec_output
+                )
+                
+                # Store for export
+                self.all_recommendations.append({
+                    'Training_Index': training_idx,
+                    'Training_Program': training_name,
+                    'Rank': rank,
+                    'Job_Index': job_idx,
+                    'Job_Name': job_name,
+                    'Similarity_Score': similarity,
+                    'Similarity_Percentage': similarity * 100
+                })
+        
+        # Table footer
+        self.log_message(
+            f"└{'─' * 8}┴{'─' * 50}┴{'─' * 50}┴{'─' * 6}┴{'─' * 13}┴{'─' * 10}┴{'─' * 12}┘",
+            self.rec_output
+        )
+                
+        self.save_recommendations()
+        self.complete_experiment()
+
+        self.log_message("\n" + "=" * 150, self.rec_output)
+        self.log_message("✅ ALL RECOMMENDATIONS COMPLETE", self.rec_output)
+        self.log_message("=" * 150, self.rec_output)
+        self.log_message(f"\nTotal: {len(self.all_recommendations)} recommendations | Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
+                    self.rec_output)
+        self.log_message(f"💡 Export available via buttons above", self.rec_output)
+        
+    def show_single_training_recommendations(self):
+        """Show job recommendations for a single selected training program"""
+        self.rec_output.delete(1.0, tk.END)
+        
+        # Check if data is ready
+        if not hasattr(self, 'similarity_matrix') or self.similarity_matrix is None:
+            messagebox.showwarning("Warning", 
+                                "Please calculate similarity matrix first!\n"
+                                "Go to 'TF-IDF & Cosine Similarity' tab and click "
+                                "'Calculate All Documents'")
+            return
+        
+        # Load options if not loaded
+        if not self.rec_training_combo['values']:
+            if not self.load_training_recommendation_options():
+                messagebox.showerror("Error", "Training data not available!")
+                return
+        
+        # Get selected training program
+        try:
+            training_idx = int(self.rec_training_combo.get().split(':')[0])
+            n_recommendations = int(self.rec_training_count_spinbox.get())
+            threshold = float(self.rec_training_threshold_var.get())
+        except:
+            messagebox.showerror("Error", "Please select a training program!")
+            return
+        
+        training_name = self.df_pelatihan.iloc[training_idx]['PROGRAM PELATIHAN']
+        training_desc = self.df_pelatihan.iloc[training_idx].get('Tujuan/Kompetensi', 'N/A')
+                
+        # Get similarities for this training program (row in matrix)
+        similarities = self.similarity_matrix[training_idx, :]
+        
+        # Filter by threshold first, then get top N
+        filtered_indices = [i for i in range(len(similarities)) if similarities[i] >= threshold]
+        
+        if not filtered_indices:
+            self.log_message("=" * 150, self.rec_output)
+            self.log_message("NO RECOMMENDATIONS FOUND", self.rec_output)
+            self.log_message("=" * 150, self.rec_output)
+            self.log_message(f"\n❌ No job positions found with similarity >= {threshold:.2f}", 
+                            self.rec_output)
+            self.log_message(f"\nTry lowering the minimum similarity threshold.", self.rec_output)
+            return
+        
+        # Sort filtered indices by similarity and take top N
+        filtered_indices.sort(key=lambda i: similarities[i], reverse=True)
+        top_indices = filtered_indices[:n_recommendations]
+        
+        # Display header
+        self.log_message("=" * 150, self.rec_output)
+        self.log_message("JOB POSITION RECOMMENDATIONS - SINGLE TRAINING PROGRAM", self.rec_output)
+        self.log_message("=" * 150, self.rec_output)
+        
+        self.log_message(f"\n🎯 TRAINING PROGRAM: {training_name}", self.rec_output)
+        self.log_message(f"📄 Description: {training_desc[:120]}...", self.rec_output)
+        
+        self.log_message(f"\n⚙️ Settings: Top N = {n_recommendations} | Threshold = {threshold:.2f} | Found = {len(filtered_indices)} jobs", self.rec_output)
+        
+        # Display as SQL-style table
+        self.log_message(f"\n\n📊 RECOMMENDATION RESULTS (Showing {len(top_indices)} of {len(filtered_indices)} matches):", self.rec_output)
+        self.log_message("=" * 150, self.rec_output)
+        
+        # Table header
+        self.log_message(
+            f"┌{'─' * 8}┬{'─' * 50}┬{'─' * 50}┬{'─' * 6}┬{'─' * 13}┬{'─' * 10}┬{'─' * 12}┐",
+            self.rec_output
+        )
+        self.log_message(
+            f"│ {'Train':<6} │ {'Training Program':<48} │ {'Recommended Job Position':<48} │ {'Rank':<4} │ {'Similarity':<11} │ {'Score %':<8} │ {'Match':<10} │",
+            self.rec_output
+        )
+        self.log_message(
+            f"│ {'Idx':<6} │ {'':<48} │ {'':<48} │ {'':<4} │ {'Score':<11} │ {'':<8} │ {'Level':<10} │",
+            self.rec_output
+        )
+        self.log_message(
+            f"├{'─' * 8}┼{'─' * 50}┼{'─' * 50}┼{'─' * 6}┼{'─' * 13}┼{'─' * 10}┼{'─' * 12}┤",
+            self.rec_output
+        )
+        
+        # Table rows
+        for rank, job_idx in enumerate(top_indices, 1):
+            job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan']
+            similarity = similarities[job_idx]
+            
+            # Determine match level
+            if similarity >= self.match_thresholds['excellent']:
+                match_level = "excellent"
+                match_emoji = "🟢"
+            elif similarity >= self.match_thresholds['very_good']:
+                match_level = "very_good"
+                match_emoji = "🟢"
+            elif similarity >= self.match_thresholds['good']:
+                match_level = "good"
+                match_emoji = "🟡"
+            elif similarity >= self.match_thresholds['fair']:
+                match_level = "fair"
+                match_emoji = "🟡"
+            else:
+                match_level = "weak"
+                match_emoji = "🔴"
+            
+            # Truncate names if too long
+            training_display = training_name[:46] + ".." if len(training_name) > 48 else training_name
+            job_display = job_name[:46] + ".." if len(job_name) > 48 else job_name
+            
+            self.log_message(
+                f"│ {training_idx:<6} │ {training_display:<48} │ {job_display:<48} │ {rank:<4} │ {similarity:<11.8f} │ {similarity*100:<8.2f} │ {match_emoji} {match_level:<8} │",
+                self.rec_output
+            )
+        
+        # Table footer
+        self.log_message(
+            f"└{'─' * 8}┴{'─' * 50}┴{'─' * 50}┴{'─' * 6}┴{'─' * 13}┴{'─' * 10}┴{'─' * 12}┘",
+            self.rec_output
+        )
+        
+        # Summary
+        self.log_message("\n" + "=" * 150, self.rec_output)
+        self.log_message("✅ RECOMMENDATION COMPLETE", self.rec_output)
+        self.log_message("=" * 150, self.rec_output)
+        self.log_message(f"\n💡 Results: {len(top_indices)} recommendations displayed | Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
+                        self.rec_output)
+        
+    def load_training_recommendation_options(self):
+        """Load training program options for recommendations"""
+        if self.df_pelatihan is None:
             return False
         
-        job_options = [f"{i}: {row['Nama Jabatan']}" 
-                    for i, row in self.df_lowongan.iterrows()]
-        self.rec_job_combo['values'] = job_options
-        if job_options:
-            self.rec_job_combo.current(0)
+        training_options = [f"{i}: {row['PROGRAM PELATIHAN']}" 
+                    for i, row in self.df_pelatihan.iterrows()]
+        self.rec_training_combo['values'] = training_options
+        if training_options:
+            self.rec_training_combo.current(0)
         return True
 
     def show_single_job_recommendations(self):
