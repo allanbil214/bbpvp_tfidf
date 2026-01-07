@@ -8,10 +8,10 @@
         <i class="fas fa-table text-info me-3"></i>
         View Data
     </h1>
-    <p class="page-subtitle">Browse and inspect imported training programs and job positions</p>
+    <p class="page-subtitle">Browse and inspect imported training programs, job positions, and placement data</p>
 </div>
 
-{% if not has_training and not has_jobs %}
+{% if not has_training and not has_jobs and not has_realisasi %}
 <div class="alert alert-warning">
     <i class="fas fa-exclamation-triangle me-2"></i>
     <strong>Warning:</strong> No data loaded yet. 
@@ -33,12 +33,15 @@
                         <i class="fas fa-database me-2"></i>
                         Select Dataset
                     </label>
-                    <select class="form-select" id="datasetSelect" {% if not has_training %}disabled{% endif %}>
+                    <select class="form-select" id="datasetSelect">
                         <option value="training" {% if has_training %}selected{% endif %}>
                             Training Programs ({{ training_count }})
                         </option>
-                        <option value="job" {% if has_jobs %}{% else %}disabled{% endif %}>
+                        <option value="job" {% if has_jobs %}{% endif %}>
                             Job Positions ({{ job_count }})
+                        </option>
+                        <option value="realisasi" {% if has_realisasi %}selected{% endif %}>
+                            Realisasi Penempatan ({{ realisasi_count }})
                         </option>
                     </select>
                 </div>
@@ -57,7 +60,7 @@
                 </div>
                 
                 <div class="d-grid gap-2">
-                    <button class="btn btn-primary" id="btnLoadData" {% if not has_training %}disabled{% endif %}>
+                    <button class="btn btn-primary" id="btnLoadData">
                         <i class="fas fa-sync-alt me-2"></i>
                         Load Data
                     </button>
@@ -73,10 +76,10 @@
             <div class="card-body">
                 <div class="mb-3">
                     <input type="text" class="form-control" id="searchInput" 
-                           placeholder="Search records..." {% if not has_training %}disabled{% endif %}>
+                           placeholder="Search records...">
                 </div>
                 <div class="d-grid gap-2">
-                    <button class="btn btn-success" id="btnSearch" {% if not has_training %}disabled{% endif %}>
+                    <button class="btn btn-success" id="btnSearch">
                         <i class="fas fa-search me-2"></i>
                         Search
                     </button>
@@ -114,12 +117,33 @@
                     </div>
                 </div>
                 
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Realisasi Penempatan:</span>
+                        <span class="badge bg-info" id="statRealisasi">{{ realisasi_count }}</span>
+                    </div>
+                    <div class="progress" style="height: 5px;">
+                        <div class="progress-bar bg-info" style="width: 100%;"></div>
+                    </div>
+                </div>
+                
                 <hr>
                 
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="text-muted"><strong>Total Records:</strong></span>
-                    <span class="badge bg-info" id="statTotal">{{ training_count + job_count }}</span>
+                    <span class="badge bg-secondary" id="statTotal">{{ training_count + job_count + realisasi_count }}</span>
                 </div>
+            </div>
+        </div>
+        
+        <!-- Statistics Panel (for realisasi only) -->
+        <div class="card mt-4" id="statisticsPanel" style="display: none;">
+            <div class="card-header">
+                <i class="fas fa-chart-bar me-2"></i>
+                Placement Statistics
+            </div>
+            <div class="card-body" id="statisticsContent">
+                <!-- Statistics will be loaded here -->
             </div>
         </div>
     </div>

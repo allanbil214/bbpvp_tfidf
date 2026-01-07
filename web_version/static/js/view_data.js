@@ -49,9 +49,114 @@ function attachEventHandlers() {
 }
 
 function updateDataTitle() {
-    const title = currentDataset === 'training' ? 
-        'Training Programs Data' : 'Job Positions Data';
-    $('#dataTitle').text(title);
+    const titles = {
+        'training': 'Training Programs Data',
+        'job': 'Job Positions Data',
+        'realisasi': 'Realisasi Penempatan Data'
+    };
+    $('#dataTitle').text(titles[currentDataset] || 'Data Records');
+}
+
+function loadStatistics() {
+    if (currentDataset !== 'realisasi') return;
+    
+    makeRequest('/api/get-statistics', 'POST', {
+        dataset: currentDataset
+    }, {
+        onSuccess: function(response) {
+            if (response.success && response.statistics) {
+                displayStatistics(response.statistics);
+            }
+        }
+    });
+}
+
+function displayStatistics(stats) {
+    let html = '';
+    
+    if (stats.total_peserta && stats.total_penempatan) {
+        html += `
+            <div class="mb-3">
+                <h6 class="fw-bold mb-2"><i class="fas fa-users me-2 text-primary"></i>Participant Summary</h6>
+                <div class="d-flex justify-content-between mb-1">
+                    <span>Total Participants:</span>
+                    <span class="fw-bold">${stats.total_peserta.toLocaleString()}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-1">
+                    <span>Total Placed:</span>
+                    <span class="fw-bold text-success">${stats.total_penempatan.toLocaleString()}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Overall Placement Rate:</span>
+                    <span class="fw-bold text-primary">${stats.placement_rate}%</span>
+                </div>
+                <div class="progress" style="height: 10px;">
+                    <div class="progress-bar bg-success" 
+                         style="width: ${stats.placement_rate}%" 
+                         role="progressbar">
+                    </div>
+                </div>
+            </div>
+            <hr>
+        `;
+    }
+    
+    if (stats.top_programs && stats.top_programs.length > 0) {
+        html += `
+            <div class="mb-3">
+                <h6 class="fw-bold mb-2"><i class="fas fa-trophy me-2 text-warning"></i>Top 3 Programs</h6>
+                <div class="list-group">
+        `;
+        
+        stats.top_programs.forEach((program, index) => {
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
+            html += `
+                <div class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">${medal} ${program.program}</h6>
+                        <small class="text-success fw-bold">${program.rate}</small>
+                    </div>
+                    <small class="text-muted">
+                        ${program.penempatan} placed / ${program.peserta} participants
+                    </small>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
+    }
+    
+    if (stats.bottom_programs && stats.bottom_programs.length > 0) {
+        html += `
+            <div class="mb-3">
+                <h6 class="fw-bold mb-2"><i class="fas fa-exclamation-triangle me-2 text-danger"></i>Need Improvement</h6>
+                <div class="list-group">
+        `;
+        
+        stats.bottom_programs.forEach((program, index) => {
+            html += `
+                <div class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">${program.program}</h6>
+                        <small class="text-danger fw-bold">${program.rate}</small>
+                    </div>
+                    <small class="text-muted">
+                        ${program.penempatan} placed / ${program.peserta} participants
+                    </small>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
+    }
+    
+    $('#statisticsContent').html(html);
 }
 
 function loadData() {
@@ -63,6 +168,14 @@ function loadData() {
         .html('<i class="fas fa-spinner fa-spin me-2"></i>Loading...');
     
     updateDataTitle();
+    
+    // Show/hide statistics panel based on dataset
+    if (currentDataset === 'realisasi') {
+        $('#statisticsPanel').show();
+        loadStatistics();
+    } else {
+        $('#statisticsPanel').hide();
+    }
     
     makeRequest('/api/get-data', 'POST', {
         dataset: currentDataset,
@@ -167,8 +280,17 @@ function displayData(response) {
         
         columns.forEach(col => {
             const value = record[col] || '';
-            const displayValue = value.length > 150 ? value.substring(0, 150) + '...' : value;
-            html += `<td><small>${displayValue}</small></td>`;
+            // For realisasi, handle numeric columns differently
+            if (currentDataset === 'realisasi' && ['Jumlah Peserta', 'Penempatan'].includes(col)) {
+                html += `<td class="text-end"><strong>${value}</strong></td>`;
+            } else if (currentDataset === 'realisasi' && col === '% Penempatan') {
+                const rate = parseFloat(value.replace('%', '')) || 0;
+                const colorClass = rate >= 60 ? 'text-success' : rate >= 40 ? 'text-warning' : 'text-danger';
+                html += `<td class="text-end fw-bold ${colorClass}">${value}</td>`;
+            } else {
+                const displayValue = value.length > 100 ? value.substring(0, 100) + '...' : value;
+                html += `<td><small>${displayValue}</small></td>`;
+            }
         });
         
         html += `<td>

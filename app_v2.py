@@ -500,6 +500,8 @@ class BBPVPMatchingGUI:
                     variable=self.view_dataset_var, value="training").pack(anchor='w', pady=3)
         ttk.Radiobutton(dataset_frame, text="Job Positions", 
                     variable=self.view_dataset_var, value="job").pack(anchor='w', pady=3)
+        ttk.Radiobutton(dataset_frame, text="Realisasi Penempatan", 
+                        variable=self.view_dataset_var, value="realisasi").pack(anchor='w', pady=3)
         
         # Records to display
         display_frame = ttk.LabelFrame(left_frame, text="Display Options", padding="10")
@@ -1773,7 +1775,8 @@ class BBPVPMatchingGUI:
             title = "TRAINING PROGRAMS DATA - TABLE VIEW"
             # Select only the columns you want to display
             display_columns = ['NO', 'PROGRAM PELATIHAN', 'DURASI JP (@45 Menit)', 'Tujuan/Kompetensi']
-        else:
+        
+        elif dataset_type == "job":
             df = self.df_lowongan
             if df is None:
                 self.log_message("❌ Please load job data first!", self.view_output)
@@ -1781,6 +1784,15 @@ class BBPVPMatchingGUI:
             title = "JOB POSITIONS DATA - TABLE VIEW"
             # Select only the columns you want to display for jobs
             display_columns = ['NO', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
+        
+        else:  # realisasi
+            df = self.df_realisasi
+            if df is None:
+                self.log_message("❌ Please load realisasi penempatan data first!", self.view_output)
+                return
+            title = "REALISASI PENEMPATAN DATA - TABLE VIEW"
+            # Select only the columns you want to display for realisasi
+            display_columns = ['No', 'Kejuruan', 'Program Pelatihan', 'Jumlah Peserta', 'Penempatan', '% Penempatan']
         
         # Filter to only existing columns
         columns = [col for col in display_columns if col in df.columns]
@@ -1843,6 +1855,33 @@ class BBPVPMatchingGUI:
         self.log_message(f"\n📋 Displayed Columns ({len(columns)}):", self.view_output)
         for i, col in enumerate(columns, 1):
             self.log_message(f"  {i}. {col}", self.view_output)
+        
+        # Add summary statistics for realisasi data
+        if dataset_type == "realisasi" and len(df) > 0:
+            self.log_message(f"\n📈 SUMMARY STATISTICS:", self.view_output)
+            total_peserta = df['Jumlah Peserta'].sum() if 'Jumlah Peserta' in df.columns else 0
+            total_penempatan = df['Penempatan'].sum() if 'Penempatan' in df.columns else 0
+            avg_pct = (total_penempatan / total_peserta * 100) if total_peserta > 0 else 0
+            
+            self.log_message(f"  • Total Participants: {total_peserta:,}", self.view_output)
+            self.log_message(f"  • Total Placed: {total_penempatan:,}", self.view_output)
+            self.log_message(f"  • Overall Placement Rate: {avg_pct:.2f}%", self.view_output)
+            
+            # Top 3 programs by placement percentage
+            if '% Penempatan' in df.columns:
+                try:
+                    # Convert percentage string to float
+                    df_temp = df.copy()
+                    df_temp['% Penempatan_float'] = df_temp['% Penempatan'].str.replace('%', '').astype(float)
+                    top_programs = df_temp.nlargest(3, '% Penempatan_float')
+                    
+                    self.log_message(f"\n🏆 TOP 3 PROGRAMS BY PLACEMENT RATE:", self.view_output)
+                    for i, (idx, row) in enumerate(top_programs.iterrows(), 1):
+                        program = row['Program Pelatihan']
+                        rate = row['% Penempatan']
+                        self.log_message(f"  {i}. {program}: {rate}", self.view_output)
+                except:
+                    pass
 
     def show_data_list_view(self):
         """Show data in vertical list format (detailed)"""
@@ -1858,7 +1897,8 @@ class BBPVPMatchingGUI:
             title = "TRAINING PROGRAMS DATA - LIST VIEW"
             # Select only the columns you want to display
             display_columns = ['NO', 'PROGRAM PELATIHAN', 'DURASI JP (@45 Menit)', 'Tujuan/Kompetensi']
-        else:
+        
+        elif dataset_type == "job":
             df = self.df_lowongan
             if df is None:
                 self.log_message("❌ Please load job data first!", self.view_output)
@@ -1866,6 +1906,15 @@ class BBPVPMatchingGUI:
             title = "JOB POSITIONS DATA - LIST VIEW"
             # Select only the columns you want to display for jobs
             display_columns = ['NO', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
+        
+        else:  # realisasi
+            df = self.df_realisasi
+            if df is None:
+                self.log_message("❌ Please load realisasi penempatan data first!", self.view_output)
+                return
+            title = "REALISASI PENEMPATAN DATA - LIST VIEW"
+            # Select only the columns you want to display for realisasi
+            display_columns = ['No', 'Kejuruan', 'Program Pelatihan', 'Jumlah Peserta', 'Penempatan', '% Penempatan']
         
         # Filter to only existing columns
         columns = [col for col in display_columns if col in df.columns]
@@ -1927,7 +1976,42 @@ class BBPVPMatchingGUI:
         # Show column summary
         self.log_message(f"\n📋 Displayed Columns ({len(columns)}):", self.view_output)
         for i, col in enumerate(columns, 1):
-            self.log_message(f"  {i:2d}. {col}", self.view_output)       
+            self.log_message(f"  {i:2d}. {col}", self.view_output)
+        
+        # Add summary statistics for realisasi data
+        if dataset_type == "realisasi" and len(df) > 0:
+            self.log_message(f"\n📈 SUMMARY STATISTICS:", self.view_output)
+            total_peserta = df['Jumlah Peserta'].sum() if 'Jumlah Peserta' in df.columns else 0
+            total_penempatan = df['Penempatan'].sum() if 'Penempatan' in df.columns else 0
+            avg_pct = (total_penempatan / total_peserta * 100) if total_peserta > 0 else 0
+            
+            self.log_message(f"  • Total Participants: {total_peserta:,}", self.view_output)
+            self.log_message(f"  • Total Placed: {total_penempatan:,}", self.view_output)
+            self.log_message(f"  • Overall Placement Rate: {avg_pct:.2f}%", self.view_output)
+            
+            # Find highest and lowest placement rates
+            if '% Penempatan' in df.columns:
+                try:
+                    # Convert percentage string to float
+                    df_temp = df.copy()
+                    df_temp['% Penempatan_float'] = df_temp['% Penempatan'].str.replace('%', '').astype(float)
+                    
+                    # Highest placement rate
+                    highest_idx = df_temp['% Penempatan_float'].idxmax()
+                    highest_row = df_temp.loc[highest_idx]
+                    
+                    # Lowest placement rate (excluding zero)
+                    non_zero = df_temp[df_temp['% Penempatan_float'] > 0]
+                    if len(non_zero) > 0:
+                        lowest_idx = non_zero['% Penempatan_float'].idxmin()
+                        lowest_row = df_temp.loc[lowest_idx]
+                    
+                    self.log_message(f"\n📊 PLACEMENT RATE EXTREMES:", self.view_output)
+                    self.log_message(f"  🏆 Highest: {highest_row['Program Pelatihan']} ({highest_row['% Penempatan']})", self.view_output)
+                    if len(non_zero) > 0:
+                        self.log_message(f"  ⚠️  Lowest: {lowest_row['Program Pelatihan']} ({lowest_row['% Penempatan']})", self.view_output)
+                except Exception as e:
+                    print(f"Error calculating placement rates: {e}")
 
     def fill_missing_pelatihan(self):
         """Fill missing values in training data"""
