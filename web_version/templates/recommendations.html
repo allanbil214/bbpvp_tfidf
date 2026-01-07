@@ -6,9 +6,9 @@
 <div class="page-header">
     <h1 class="page-title">
         <i class="fas fa-star text-warning me-3"></i>
-        Training Program Recommendations
+        Job-Training Recommendations
     </h1>
-    <p class="page-subtitle">Get personalized training recommendations for job positions</p>
+    <p class="page-subtitle">Get personalized recommendations between jobs and training programs</p>
 </div>
 
 {% if not has_similarity %}
@@ -30,21 +30,40 @@
             <div class="card-body">
                 <div class="mb-4">
                     <label class="form-label fw-bold">
+                        <i class="fas fa-exchange-alt me-2"></i>
+                        Recommendation Direction
+                    </label>
+                    <select class="form-select" id="recDirection" {% if not has_similarity %}disabled{% endif %}>
+                        <option value="by_job" selected>Jobs → Training Programs</option>
+                        <option value="by_training">Training Programs → Jobs</option>
+                    </select>
+                    <small class="text-muted">Choose the direction of recommendations</small>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold">
                         <i class="fas fa-crosshairs me-2"></i>
                         Recommendation Mode
                     </label>
                     <select class="form-select" id="recMode" {% if not has_similarity %}disabled{% endif %}>
-                        <option value="all" selected>All Job Positions</option>
-                        <option value="single">Single Job Position</option>
+                        <option value="all" selected>All Items</option>
+                        <option value="single">Single Item</option>
                     </select>
-                    <small class="text-muted">Choose between all jobs or a specific position</small>
+                    <small class="text-muted">Choose between all items or a specific one</small>
                 </div>
                 
-                <div id="singleJobConfig" style="display: none;">
-                    <div class="mb-3">
+                <div id="singleItemConfig" style="display: none;">
+                    <div class="mb-3" id="jobSelectionDiv">
                         <label class="form-label fw-bold">Job Position</label>
                         <select class="form-select" id="jobSelect" {% if not has_similarity %}disabled{% endif %}>
                             <option value="">Loading job positions...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3" id="trainingSelectionDiv" style="display: none;">
+                        <label class="form-label fw-bold">Training Program</label>
+                        <select class="form-select" id="trainingSelect" {% if not has_similarity %}disabled{% endif %}>
+                            <option value="">Loading training programs...</option>
                         </select>
                     </div>
                 </div>
@@ -56,7 +75,7 @@
                     </label>
                     <input type="number" class="form-control" id="topN" value="3" min="1" max="10" 
                            {% if not has_similarity %}disabled{% endif %}>
-                    <small class="text-muted">Number of recommendations per job</small>
+                    <small class="text-muted">Number of recommendations per item</small>
                 </div>
                 
                 <div class="mb-4">
@@ -113,7 +132,7 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>
                     <i class="fas fa-list me-2"></i>
-                    Recommendation Results
+                    <span id="resultsTitle">Recommendation Results</span>
                 </span>
                 <span class="badge bg-light text-dark" id="resultCount">0 results</span>
             </div>

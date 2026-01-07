@@ -22,6 +22,7 @@ function attachEventHandlers() {
     $('#btnLoadBoth').click(() => loadData('both'));
     $('#btnLoadTraining').click(() => loadData('training'));
     $('#btnLoadJobs').click(() => loadData('jobs'));
+    $('#btnLoadRealisasi').click(() => loadData('realisasi'));  // NEW
     
     // Clear logs
     $('#btnClearLogs').click(clearLogs);
@@ -42,14 +43,25 @@ function updateSourceOptions() {
 function loadData(type) {
     const source = $('input[name="dataSource"]:checked').val();
     const buttonId = type === 'both' ? '#btnLoadBoth' : 
-                     type === 'training' ? '#btnLoadTraining' : '#btnLoadJobs';
+                     type === 'training' ? '#btnLoadTraining' : 
+                     type === 'jobs' ? '#btnLoadJobs' :
+                     '#btnLoadRealisasi';  // NEW
     const $button = $(buttonId);
     
     // Validate files for local source
-    if (source === 'local') {
+    if (source === 'local' && type !== 'realisasi') {
         const validation = validateLocalFiles(type);
         if (!validation.valid) {
             showAlert('danger', validation.message);
+            return;
+        }
+    }
+    
+    // NEW: Validate realisasi file for local
+    if (source === 'local' && type === 'realisasi') {
+        const realisasiFile = $('#realisasiFile')[0].files[0];
+        if (!realisasiFile) {
+            showAlert('danger', '<strong>Error!</strong> Please select a realisasi file.');
             return;
         }
     }
@@ -74,9 +86,17 @@ function loadData(type) {
     addImportLog(`Source: ${source}`, 'info');
     
     if (source === 'github') {
-        loadFromGithub(type, $button, originalText);
+        if (type === 'realisasi') {
+            loadRealisasiFromGithub($button, originalText);  // NEW
+        } else {
+            loadFromGithub(type, $button, originalText);
+        }
     } else {
-        loadFromLocal(type, $button, originalText);
+        if (type === 'realisasi') {
+            loadRealisasiFromLocal($button, originalText);  // NEW
+        } else {
+            loadFromLocal(type, $button, originalText);
+        }
     }
 }
 
@@ -206,10 +226,20 @@ function handleLoadSuccess(response) {
         animateValue('jobCount', 0, response.job_count, 1000);
     }
     
+    if (response.realisasi_count !== undefined) {
+        addImportLog(`📈 Realisasi Penempatan: ${response.realisasi_count} records`, 'success');
+        $('#realisasiCount').text(response.realisasi_count);
+        animateValue('realisasiCount', 0, response.realisasi_count, 1000);
+    }
+
     addImportLog('='.repeat(80), 'success');
     addImportLog('', 'info');
     
-    const totalRecords = (response.training_count || 0) + (response.job_count || 0);
+    const totalRecords =
+    (response.training_count || 0) +
+    (response.job_count || 0) +
+    (response.realisasi_count || 0);
+    
     addImportLog(`📊 Total records loaded: ${totalRecords}`, 'info');
     addImportLog('', 'info');
     
@@ -274,4 +304,88 @@ function clearLogs() {
             <p>Logs cleared. Ready to import data.</p>
         </div>
     `);
+}
+
+function loadRealisasiFromGithub($button, originalText) {
+    makeRequest('/api/load-realisasi', 'POST', {
+        source: 'github'
+    }, {
+        onSuccess: function(response) {
+            if (response.success) {
+                addImportLog('', 'info');
+                addImportLog('✓ Realisasi data loaded successfully!', 'success');
+                addImportLog('='.repeat(80), 'success');
+                addImportLog(`📊 Realisasi Records: ${response.realisasi_count}`, 'success');
+                
+                $('#realisasiCount').text(response.realisasi_count);
+                animateValue('realisasiCount', 0, response.realisasi_count, 1000);
+                
+                const successAlert = showAlert('success', 
+                    '<strong>Success!</strong> Realisasi data loaded successfully.');
+                $('#importStatus').append(successAlert);
+            } else {
+                handleLoadError(response.message);
+            }
+        },
+        onError: function(xhr, status, error) {
+            handleLoadError('An unexpected error occurred. Please try again.');
+        },
+        onComplete: function() {
+            $button.prop('disabled', false).html(originalText);
+        }
+    });
+}
+
+// NEW: Load realisasi from local file
+function loadRealisasiFromLocal($button, originalText) {
+    const formData = new FormData();
+    formData.append('source', 'local');
+    
+    const realisasiFile = $('#realisasiFile')[0].files[0];
+    if (realisasiFile) {
+        formData.append('realisasi_file', realisasiFile);
+        addImportLog(`Realisasi file: ${realisasiFile.name} (${formatFileSize(realisasiFile.size)})`, 'info');
+    }
+    
+    addImportLog('Uploading file...', 'info');
+    
+    $.ajax({
+        url: '/api/load-realisasi',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            if (response.success) {
+                addImportLog('', 'info');
+                addImportLog('✓ Realisasi data loaded successfully!', 'success');
+                addImportLog('='.repeat(80), 'success');
+                addImportLog(`📊 Realisasi Records: ${response.realisasi_count}`, 'success');
+                
+                $('#realisasiCount').text(response.realisasi_count);
+                animateValue('realisasiCount', 0, response.realisasi_count, 1000);
+                
+                const successAlert = showAlert('success', 
+                    '<strong>Success!</strong> Realisasi data loaded successfully.');
+                $('#importStatus').append(successAlert);
+            } else {
+                handleLoadError(response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            let errorMessage = 'An unexpected error occurred. Please try again.';
+            try {
+                const response = JSON.parse(xhr.responseText);
+                if (response.message) {
+                    errorMessage = response.message;
+                }
+            } catch (e) {
+                // Use default error message
+            }
+            handleLoadError(errorMessage);
+        },
+        complete: function() {
+            $button.prop('disabled', false).html(originalText);
+        }
+    });
 }

@@ -64,12 +64,17 @@
                         <input type="file" class="form-control" id="jobFile" accept=".xlsx,.xls">
                         <small class="text-muted">Excel file with job positions</small>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Realisasi Penempatan File</label>
+                        <input type="file" class="form-control" id="realisasiFile" accept=".xlsx,.xls">
+                        <small class="text-muted">Excel file with placement realization data</small>
+                    </div>
                 </div>
                 
                 <div class="d-grid gap-2">
                     <button class="btn btn-success btn-lg" id="btnLoadBoth">
                         <i class="fas fa-download me-2"></i>
-                        Load BOTH Datasets
+                        Load ALL Datasets
                     </button>
                     
                     <hr>
@@ -86,6 +91,11 @@
                     <button class="btn btn-outline-primary" id="btnLoadJobs">
                         <i class="fas fa-briefcase me-2"></i>
                         Load Job Data Only
+                    </button>
+
+                    <button class="btn btn-outline-primary" id="btnLoadRealisasi">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        Load Realisasi Penempatan
                     </button>
                 </div>
             </div>
@@ -114,7 +124,7 @@
         </div>
         
         <div class="row g-4 mt-1">
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <div class="card">
                     <div class="card-body text-center">
                         <i class="fas fa-graduation-cap fa-3x text-primary mb-3"></i>
@@ -123,12 +133,21 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <div class="card">
                     <div class="card-body text-center">
                         <i class="fas fa-briefcase fa-3x text-success mb-3"></i>
                         <h3 class="mb-1" id="jobCount">0</h3>
                         <p class="text-muted mb-0">Job Positions Loaded</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-chart-bar fa-3x text-info mb-3"></i>
+                        <h3 class="mb-1" id="realisasiCount">0</h3>
+                        <p class="text-muted mb-0">Realisasi Records Loaded</p>
                     </div>
                 </div>
             </div>

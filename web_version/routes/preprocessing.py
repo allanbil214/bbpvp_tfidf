@@ -86,29 +86,90 @@ def api_preprocess_step():
 
 @preprocessing_bp.route('/api/process-all', methods=['POST'])
 def api_process_all():
-    """Process all data"""
+    """Process all data with caching support"""
     try:
         experiment_id = data_store.current_experiment_id
         
         # Process training data
         if data_store.df_pelatihan is not None:
-            df = preprocess_dataframe(data_store.df_pelatihan, 'training')
-            data_store.df_pelatihan = df
+            # Generate cache key
+            cache_key = f"training_{data_store.get_cache_key(data_store.df_pelatihan, 'training')}"
+            
+            # Try to load from cache
+            print("Checking cache for training data...")
+            cached_data = data_store.load_from_cache(cache_key)
+            
+            if cached_data is not None:
+                print("✓ Cache found! Loading preprocessed training data...")
+                # Restore cached columns
+                for col in ['text_features', 'normalized', 'no_stopwords', 'tokens', 
+                           'stemmed_tokens', 'stemmed', 'token_count', 'preprocessed_text']:
+                    if col in cached_data:
+                        data_store.df_pelatihan[col] = cached_data[col]
+            else:
+                print("No cache found. Processing training data from scratch...")
+                df = preprocess_dataframe(data_store.df_pelatihan, 'training')
+                data_store.df_pelatihan = df
+                
+                # Save to cache
+                print("Saving training data to cache...")
+                cache_data = {
+                    'text_features': df['text_features'],
+                    'normalized': df['normalized'],
+                    'no_stopwords': df['no_stopwords'],
+                    'tokens': df['tokens'],
+                    'stemmed_tokens': df['stemmed_tokens'],
+                    'stemmed': df['stemmed'],
+                    'token_count': df['token_count'],
+                    'preprocessed_text': df['preprocessed_text']
+                }
+                data_store.save_to_cache(cache_key, cache_data)
             
             # Save samples
             if experiment_id:
-                for idx in range(min(TOTAL_SAVED_SAMPLE, len(df))):
-                    save_preprocessing_sample(experiment_id, 'training', idx, df.iloc[idx])
+                for idx in range(min(TOTAL_SAVED_SAMPLE, len(data_store.df_pelatihan))):
+                    save_preprocessing_sample(experiment_id, 'training', idx, 
+                                            data_store.df_pelatihan.iloc[idx])
         
-        # Process job data
+        # Process job data (similar structure)
         if data_store.df_lowongan is not None:
-            df = preprocess_dataframe(data_store.df_lowongan, 'job')
-            data_store.df_lowongan = df
+            # Generate cache key
+            cache_key = f"job_{data_store.get_cache_key(data_store.df_lowongan, 'job')}"
+            
+            # Try to load from cache
+            print("Checking cache for job data...")
+            cached_data = data_store.load_from_cache(cache_key)
+            
+            if cached_data is not None:
+                print("✓ Cache found! Loading preprocessed job data...")
+                for col in ['text_features', 'normalized', 'no_stopwords', 'tokens', 
+                           'stemmed_tokens', 'stemmed', 'token_count', 'preprocessed_text']:
+                    if col in cached_data:
+                        data_store.df_lowongan[col] = cached_data[col]
+            else:
+                print("No cache found. Processing job data from scratch...")
+                df = preprocess_dataframe(data_store.df_lowongan, 'job')
+                data_store.df_lowongan = df
+                
+                # Save to cache
+                print("Saving job data to cache...")
+                cache_data = {
+                    'text_features': df['text_features'],
+                    'normalized': df['normalized'],
+                    'no_stopwords': df['no_stopwords'],
+                    'tokens': df['tokens'],
+                    'stemmed_tokens': df['stemmed_tokens'],
+                    'stemmed': df['stemmed'],
+                    'token_count': df['token_count'],
+                    'preprocessed_text': df['preprocessed_text']
+                }
+                data_store.save_to_cache(cache_key, cache_data)
             
             # Save samples
             if experiment_id:
-                for idx in range(min(TOTAL_SAVED_SAMPLE, len(df))):
-                    save_preprocessing_sample(experiment_id, 'job', idx, df.iloc[idx])
+                for idx in range(min(TOTAL_SAVED_SAMPLE, len(data_store.df_lowongan))):
+                    save_preprocessing_sample(experiment_id, 'job', idx, 
+                                            data_store.df_lowongan.iloc[idx])
         
         print("✓ All data processed successfully")
         return jsonify({'success': True, 'message': 'All data processed successfully'})

@@ -77,12 +77,14 @@ class BBPVPMatchingGUI:
         # Data storage
         self.df_pelatihan = None
         self.df_lowongan = None
+        self.df_realisasi = None  
         self.current_step = 0
         self.total_saved_sample = 5
         
-        # GitHub URLs
-        self.github_training_url = "https://github.com/robarade-dev/tesisadenin/raw/refs/heads/main/dataprogrampelatihan.xlsx"
-        self.github_jobs_url = "https://github.com/robarade-dev/tesisadenin/raw/refs/heads/main/datalowonganpekerjaan.xlsx"
+        # GitHub URLs 
+        self.github_training_url = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/dataprogrampelatihan.xlsx"
+        self.github_jobs_url = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/datalowonganpekerjaan.xlsx"
+        self.github_realisasi_url = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/realisasipenempatan.xlsx"  
         
         # Indonesian stopwords
         self.stopwords = {
@@ -384,7 +386,7 @@ class BBPVPMatchingGUI:
         button_frame = ttk.LabelFrame(left_frame, text="Load Options", padding="10")
         button_frame.pack(fill='x', pady=10)
         
-        ttk.Button(button_frame, text="Load BOTH Data\n(Training + Job)", 
+        ttk.Button(button_frame, text="Load All Data", 
                   command=self.load_both_data, width=30,
                   style='Accent.TButton').pack(pady=5)
         
@@ -397,6 +399,8 @@ class BBPVPMatchingGUI:
                   command=self.load_training_data, width=30).pack(pady=3)
         ttk.Button(button_frame, text="Load Job Data", 
                   command=self.load_job_data, width=30).pack(pady=3)
+        ttk.Button(button_frame, text="Load Realisasi Penempatan",
+                   command=self.load_realisasi_data, width=30).pack(pady=3)
         
         # Info box
         info_frame = ttk.LabelFrame(left_frame, text="💡 Quick Guide", padding="10")
@@ -1547,14 +1551,14 @@ class BBPVPMatchingGUI:
         
         self.import_status.delete(1.0, tk.END)
         self.log_message("=" * 80)
-        self.log_message("LOADING BOTH DATASETS FROM GITHUB")
+        self.log_message("LOADING ALL DATASETS FROM GITHUB")
         self.log_message("=" * 80)
         
         def load():
             try:
                 # Load Training Data
-                self.log_message("\n[1/2] Loading Training Data (Pelatihan)...", self.import_status)
-                self.update_progress(1, 2, "Loading training data", self.import_status)
+                self.log_message("\n[1/3] Loading Training Data (Pelatihan)...", self.import_status)
+                self.update_progress(1, 3, "Loading training data", self.import_status)
                 self.log_message(f"URL: {self.github_training_url}", self.import_status)
                 self.df_pelatihan = pd.read_excel(self.github_training_url)
                 self.log_message(f"✓ Training Data loaded: {self.df_pelatihan.shape[0]} rows, "
@@ -1564,21 +1568,41 @@ class BBPVPMatchingGUI:
                 self.fill_missing_pelatihan()
                 
                 # Load Job Data
-                self.log_message("\n[2/2] Loading Job Data (Lowongan)...", self.import_status)
-                self.update_progress(2, 2, "Loading job data", self.import_status)
+                self.log_message("\n[2/3] Loading Job Data (Lowongan)...", self.import_status)
+                self.update_progress(2, 3, "Loading job data", self.import_status)
                 self.log_message(f"URL: {self.github_jobs_url}", self.import_status)
                 self.df_lowongan = pd.read_excel(self.github_jobs_url)
                 self.log_message(f"✓ Job Data loaded: {self.df_lowongan.shape[0]} rows, "
                             f"{self.df_lowongan.shape[1]} columns", self.import_status)
                 
+                # NEW: Check vacancy column
+                if 'Perkiraan Lowongan' not in self.df_lowongan.columns:
+                    self.log_message(f"⚠ Adding default vacancy estimates", self.import_status)
+                    self.df_lowongan['Perkiraan Lowongan'] = 1
+                
+                # NEW: Load Realisasi Data
+                self.log_message("\n[3/3] Loading Realisasi Penempatan...", self.import_status)
+                self.update_progress(3, 3, "Loading placement data", self.import_status)
+                self.log_message(f"URL: {self.github_realisasi_url}", self.import_status)
+                self.df_realisasi = pd.read_excel(self.github_realisasi_url)
+                self.log_message(f"✓ Realisasi Data loaded: {self.df_realisasi.shape[0]} rows, "
+                            f"{self.df_realisasi.shape[1]} columns", self.import_status)
+                
+                # Calculate percentage if missing
+                if '% Penempatan' not in self.df_realisasi.columns:
+                    self.df_realisasi['% Penempatan'] = (
+                        self.df_realisasi['Penempatan'] / self.df_realisasi['Jumlah Peserta'] * 100
+                    ).round(2)
+                
                 # Summary
                 self.log_message("\n" + "=" * 80, self.import_status)
-                self.log_message("✓ BOTH DATASETS LOADED SUCCESSFULLY!", self.import_status)
+                self.log_message("✓ ALL DATASETS LOADED SUCCESSFULLY!", self.import_status)
                 self.log_message("=" * 80, self.import_status)
                 self.log_message(f"\n📊 Summary:", self.import_status)
                 self.log_message(f"  • Training Programs: {len(self.df_pelatihan)} records", self.import_status)
                 self.log_message(f"  • Job Positions: {len(self.df_lowongan)} records", self.import_status)
-                self.log_message(f"  • Total: {len(self.df_pelatihan) + len(self.df_lowongan)} records", self.import_status)
+                self.log_message(f"  • Realisasi Records: {len(self.df_realisasi)} programs", self.import_status)  # NEW
+                self.log_message(f"  • Total: {len(self.df_pelatihan) + len(self.df_lowongan) + len(self.df_realisasi)} records", self.import_status)
                 
                 self.log_message(f"\n📋 Training Data Columns:", self.import_status)
                 self.log_message(f"  {', '.join(self.df_pelatihan.columns.tolist())}", self.import_status)
@@ -1675,6 +1699,66 @@ class BBPVPMatchingGUI:
         
         threading.Thread(target=load, daemon=True).start()
 
+    def load_realisasi_data(self):
+        """Load placement realization data"""
+        self.import_status.delete(1.0, tk.END)
+        self.log_message("Loading Placement Realization Data...")
+        
+        def load():
+            try:
+                if self.data_source_var.get() == "github":
+                    self.log_message(f"Fetching from GitHub...")
+                    self.df_realisasi = pd.read_excel(self.github_realisasi_url)
+                else:
+                    filename = filedialog.askopenfilename(
+                        title="Select Realisasi Penempatan File",
+                        filetypes=[("Excel files", "*.xlsx *.xls")]
+                    )
+                    if filename:
+                        self.log_message(f"Loading from: {filename}")
+                        self.df_realisasi = pd.read_excel(filename)
+                    else:
+                        self.log_message("No file selected.")
+                        return
+                
+                self.log_message(f"✓ Loaded: {self.df_realisasi.shape[0]} rows, "
+                            f"{self.df_realisasi.shape[1]} columns")
+                self.log_message(f"\nColumns: {', '.join(self.df_realisasi.columns.tolist())}")
+                
+                # Validate required columns
+                required_cols = ['Program Pelatihan', 'Jumlah Peserta', 'Penempatan']
+                missing_cols = [col for col in required_cols if col not in self.df_realisasi.columns]
+                
+                if missing_cols:
+                    self.log_message(f"⚠ Warning: Missing columns: {missing_cols}")
+                else:
+                    self.log_message(f"✓ All required columns present")
+                    
+                    # Calculate percentage if not present
+                    if '% Penempatan' not in self.df_realisasi.columns:
+                        self.df_realisasi['% Penempatan'] = (
+                            self.df_realisasi['Penempatan'] / self.df_realisasi['Jumlah Peserta'] * 100
+                        ).round(2)
+                        self.log_message(f"✓ Calculated placement percentages")
+                    
+                    # Summary statistics
+                    total_peserta = self.df_realisasi['Jumlah Peserta'].sum()
+                    total_penempatan = self.df_realisasi['Penempatan'].sum()
+                    avg_pct = (total_penempatan / total_peserta * 100) if total_peserta > 0 else 0
+                    
+                    self.log_message(f"\n📊 Summary:")
+                    self.log_message(f"  Total Participants: {total_peserta}")
+                    self.log_message(f"  Total Placed: {total_penempatan}")
+                    self.log_message(f"  Overall Placement Rate: {avg_pct:.2f}%")
+                
+                self.log_message(f"\nFirst row preview:")
+                self.log_message(str(self.df_realisasi.head(1)))
+                
+            except Exception as e:
+                self.log_message(f"✗ Error: {str(e)}")
+        
+        threading.Thread(target=load, daemon=True).start()
+
     def show_data_table_view(self):
         """Show data in horizontal table format (Excel-like)"""
         self.view_output.delete(1.0, tk.END)
@@ -1696,7 +1780,7 @@ class BBPVPMatchingGUI:
                 return
             title = "JOB POSITIONS DATA - TABLE VIEW"
             # Select only the columns you want to display for jobs
-            display_columns = ['NO', 'Nama Jabatan', 'Deskripsi KBJI']
+            display_columns = ['NO', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
         
         # Filter to only existing columns
         columns = [col for col in display_columns if col in df.columns]
@@ -1781,7 +1865,7 @@ class BBPVPMatchingGUI:
                 return
             title = "JOB POSITIONS DATA - LIST VIEW"
             # Select only the columns you want to display for jobs
-            display_columns = ['NO', 'Nama Jabatan', 'Deskripsi KBJI']
+            display_columns = ['NO', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
         
         # Filter to only existing columns
         columns = [col for col in display_columns if col in df.columns]

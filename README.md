@@ -12,10 +12,11 @@ pyinstaller --noconfirm --onefile --windowed --icon "C:\Users\Allan\Documents\bb
 '''
 
 # to-do
-- tambah not all but few data to calculate all preprocessing and other stuff (added caching instead | done | desktop version)
-- add progress bar (done | desktop version)
-- fix weird column on view data especially on training (fixed | desktop version)
+- tambah not all but few data to calculate all preprocessing and other stuff (added caching instead | done | both version)
+- add progress bar (done | both version)
+- fix weird column on view data especially on training (fixed | desktop version only)
 - show vector for text on view data?
-- add some animation (web version)
-- Tambahkan rekomendasi by training instead by job too (done | desktop version)
+- add some animation (web version)  (no need)
+- Tambahkan rekomendasi by training instead by job too (done | both version)
 - Add scroll bar to left panel (done | desktop version only)
+- Load Realisasi for later analysis/evaluation usage (done)

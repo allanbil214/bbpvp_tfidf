@@ -18,8 +18,9 @@ DB_CONFIG = {
 }
 
 # GitHub Data URLs
-GITHUB_TRAINING_URL = "https://github.com/robarade-dev/tesisadenin/raw/refs/heads/main/dataprogrampelatihan.xlsx"
-GITHUB_JOBS_URL = "https://github.com/robarade-dev/tesisadenin/raw/refs/heads/main/datalowonganpekerjaan.xlsx"
+GITHUB_TRAINING_URL = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/dataprogrampelatihan.xlsx"
+GITHUB_JOBS_URL = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/datalowonganpekerjaan.xlsx"
+GITHUB_REALISASI_URL = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/realisasipenempatan.xlsx"
 
 # Indonesian Stopwords
 STOPWORDS = {
@@ -47,6 +48,9 @@ DEFAULT_MATCH_THRESHOLDS = {
     'good': 0.20,
     'fair': 0.10
 }
+
+CACHE_DIR = "cache"
+CACHE_ENABLED = True
 
 # Sastrawi Configuration
 try:
