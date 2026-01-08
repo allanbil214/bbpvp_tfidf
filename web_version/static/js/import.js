@@ -167,6 +167,14 @@ function loadFromLocal(type, $button, originalText) {
         }
     }
     
+    if (type === 'both') {
+        const realisasiFile = $('#realisasiFile')[0].files[0];
+        if (realisasiFile) {
+            formData.append('realisasi_file', realisasiFile);
+            addImportLog(`Realisasi file: ${realisasiFile.name} (${formatFileSize(realisasiFile.size)})`, 'info');
+        }
+    }
+    
     addImportLog('Uploading files...', 'info');
     
     // Use jQuery AJAX for file upload

@@ -39,11 +39,11 @@
                         Job Matching Threshold
                     </label>
                     <input type="range" class="form-range" id="jobThreshold" 
-                           min="0" max="100" value="30" step="1"
+                           min="0" max="100" value="1" step="1"
                            {% if not has_data %}disabled{% endif %}>
                     <div class="d-flex justify-content-between">
                         <small class="text-muted">0%</small>
-                        <small class="fw-bold text-primary" id="jobThresholdValue">30%</small>
+                        <small class="fw-bold text-primary" id="jobThresholdValue">1%</small>
                         <small class="text-muted">100%</small>
                     </div>
                     <small class="text-muted">Minimum similarity to count as matching job</small>
@@ -55,11 +55,11 @@
                         Program Matching Threshold
                     </label>
                     <input type="range" class="form-range" id="programThreshold" 
-                           min="0" max="100" value="30" step="1"
+                           min="0" max="100" value="1" step="1"
                            {% if not has_data %}disabled{% endif %}>
                     <div class="d-flex justify-content-between">
                         <small class="text-muted">0%</small>
-                        <small class="fw-bold text-primary" id="programThresholdValue">30%</small>
+                        <small class="fw-bold text-primary" id="programThresholdValue">1%</small>
                         <small class="text-muted">100%</small>
                     </div>
                     <small class="text-muted">Minimum confidence for program match</small>

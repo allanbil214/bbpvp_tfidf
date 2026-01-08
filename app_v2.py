@@ -1004,10 +1004,10 @@ class BBPVPMatchingGUI:
         program_container.pack(fill='x', pady=(0, 10))
 
         self.program_threshold_scale = ttk.Scale(program_container, from_=0.0, to=1.0, orient='horizontal')
-        self.program_threshold_scale.set(0.30)
+        self.program_threshold_scale.set(0.01)
         self.program_threshold_scale.pack(side='left', fill='x', expand=True, padx=(0, 10))
 
-        self.program_threshold_label = ttk.Label(program_container, text="0.30", width=6)
+        self.program_threshold_label = ttk.Label(program_container, text="0.01", width=6)
         self.program_threshold_label.pack(side='right')
 
         def update_program_label(*args):
@@ -1022,10 +1022,10 @@ class BBPVPMatchingGUI:
         job_container.pack(fill='x', pady=(0, 5))
 
         self.job_threshold_scale = ttk.Scale(job_container, from_=0.0, to=1.0, orient='horizontal')
-        self.job_threshold_scale.set(0.30)
+        self.job_threshold_scale.set(0.01)
         self.job_threshold_scale.pack(side='left', fill='x', expand=True, padx=(0, 10))
 
-        self.job_threshold_label = ttk.Label(job_container, text="0.30", width=6)
+        self.job_threshold_label = ttk.Label(job_container, text="0.01", width=6)
         self.job_threshold_label.pack(side='right')
 
         def update_job_label(*args):

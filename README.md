@@ -8,7 +8,7 @@ pyinstaller --noconfirm --onedir --windowed --icon "C:\Users\Allan\Documents\bbp
 
 # One File
 '''
-pyinstaller --noconfirm --onefile --windowed --icon "C:\Users\Allan\Documents\bbpvp_tfidf\app.ico" --add-data "C:\Users\Allan\AppData\Roaming\Python\Python314\site-packages\Sastrawi;Sastrawi/" --hidden-import "mysql.connector.plugins.mysql_native_password" --hidden-import "mysql.connector.locales.eng" --collect-all "mysql.connector"  "C:\Uirsers\Allan\Documents\bbpvp_tfidf\app_v2.py"
+PyInstaller --noconfirm --onefile --windowed --icon "C:\Users\Allan\Documents\bbpvp_tfidf\app.ico" --add-data "C:\Users\Allan\AppData\Roaming\Python\Python314\site-packages\Sastrawi;Sastrawi/" --hidden-import "mysql.connector.plugins.mysql_native_password" --hidden-import "mysql.connector.locales.eng" --collect-all "mysql.connector"  "C:\Users\Allan\Documents\bbpvp_tfidf\app_v2.py"
 '''
 
 # to-do
@@ -16,7 +16,6 @@ pyinstaller --noconfirm --onefile --windowed --icon "C:\Users\Allan\Documents\bb
 - add progress bar (done | both version)
 - fix weird column on view data especially on training (fixed | desktop version only)
 - show vector for text on view data?
-- add some animation (web version)  (no need)
 - Tambahkan rekomendasi by training instead by job too (done | both version)
 - Add scroll bar to left panel (done | desktop version only)
 - Load Realisasi for later analysis/evaluation usage (done)
