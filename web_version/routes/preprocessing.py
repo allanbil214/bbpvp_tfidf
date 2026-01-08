@@ -78,6 +78,20 @@ def api_preprocess_step():
             result['output'] = stemmed_tokens
             result['original_tokens'] = tokens
             result['token_count'] = len(stemmed_tokens)
+        elif step == 5:  # Show All Steps
+            normalized = normalize_text(original)
+            no_stopwords = remove_stopwords(normalized)
+            tokens = tokenize_text(no_stopwords)
+            stemmed_tokens = stem_tokens(tokens)
+            
+            result['all_steps'] = {
+                'original': original,
+                'normalized': normalized,
+                'no_stopwords': no_stopwords,
+                'tokens': tokens,
+                'stemmed_tokens': stemmed_tokens,
+                'token_count': len(stemmed_tokens)
+            }
         
         return jsonify(result)
     
