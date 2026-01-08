@@ -52,14 +52,7 @@ def fill_missing_pelatihan(df):
             return f"Setelah mengikuti pelatihan ini peserta kompeten dalam melaksanakan pekerjaan {program.lower()} sesuai standar dan SOP di tempat kerja."
         return row['Tujuan/Kompetensi']
     
-    # def fill_deskripsi(row):
-    #     if pd.isna(row['Deskripsi Program']) or str(row['Deskripsi Program']).strip() == '':
-    #         program = row['PROGRAM PELATIHAN'].strip()
-    #         return f"Pelatihan ini adalah pelatihan untuk melaksanakan pekerjaan {program.lower()} sesuai standar dan SOP di tempat kerja."
-    #     return row['Deskripsi Program']
-    
     df['Tujuan/Kompetensi'] = df.apply(fill_tujuan, axis=1)
-    # df['Deskripsi Program'] = df.apply(fill_deskripsi, axis=1)
     return df
 
 def preprocess_dataframe(df, dataset_type='training'):
@@ -68,7 +61,7 @@ def preprocess_dataframe(df, dataset_type='training'):
     
     Args:
         df: DataFrame to process
-        dataset_type: 'training' or 'job'
+        dataset_type: 'training', 'job', or 'realisasi'
     
     Returns:
         Processed DataFrame
@@ -78,8 +71,13 @@ def preprocess_dataframe(df, dataset_type='training'):
     # Select text column based on dataset type
     if dataset_type == 'training':
         df['text_features'] = df['Tujuan/Kompetensi'].fillna('')
-    else:
+    elif dataset_type == 'job':
         df['text_features'] = df['Deskripsi KBJI'].fillna('')
+    elif dataset_type == 'realisasi':
+        df['text_features'] = df['Program Pelatihan'].fillna('')
+    else:
+        # Fallback: try to use any text column available
+        df['text_features'] = df.iloc[:, 0].fillna('') if len(df.columns) > 0 else ''
     
     # Apply preprocessing steps
     df['normalized'] = df['text_features'].apply(normalize_text)

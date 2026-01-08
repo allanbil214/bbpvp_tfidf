@@ -13,6 +13,7 @@ from routes.view_data import view_data_bp  # NEW
 from routes.preprocessing import preprocessing_bp
 from routes.tfidf import tfidf_bp
 from routes.recommendations import recommendations_bp
+from routes.analysis import analysis_bp
 from routes.settings import settings_bp
 
 def create_app():
@@ -30,6 +31,7 @@ def create_app():
     app.register_blueprint(preprocessing_bp)
     app.register_blueprint(tfidf_bp)
     app.register_blueprint(recommendations_bp)
+    app.register_blueprint(analysis_bp)
     app.register_blueprint(settings_bp)
     
     return app

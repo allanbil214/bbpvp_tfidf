@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Market Analysis - BBPVP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-chart-line text-success me-3"></i>
+        Market Analysis
+    </h1>
+    <p class="page-subtitle">Analyze job market demand and placement opportunities for training programs</p>
+</div>
+
+{% if not has_data %}
+<div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>Warning:</strong> Required data not loaded. 
+    Please ensure you have:
+    <ul class="mb-0 mt-2">
+        <li>Imported training programs, job positions, and realisasi data</li>
+        <li>Completed preprocessing</li>
+        <li>Calculated TF-IDF similarity matrix</li>
+    </ul>
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <!-- Left Panel: Configuration -->
+    <div class="col-lg-3">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-sliders-h me-2"></i>
+                Configuration
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-briefcase me-2"></i>
+                        Job Matching Threshold
+                    </label>
+                    <input type="range" class="form-range" id="jobThreshold" 
+                           min="0" max="100" value="30" step="1"
+                           {% if not has_data %}disabled{% endif %}>
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted">0%</small>
+                        <small class="fw-bold text-primary" id="jobThresholdValue">30%</small>
+                        <small class="text-muted">100%</small>
+                    </div>
+                    <small class="text-muted">Minimum similarity to count as matching job</small>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-graduation-cap me-2"></i>
+                        Program Matching Threshold
+                    </label>
+                    <input type="range" class="form-range" id="programThreshold" 
+                           min="0" max="100" value="30" step="1"
+                           {% if not has_data %}disabled{% endif %}>
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted">0%</small>
+                        <small class="fw-bold text-primary" id="programThresholdValue">30%</small>
+                        <small class="text-muted">100%</small>
+                    </div>
+                    <small class="text-muted">Minimum confidence for program match</small>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-lg" id="btnCalculate"
+                            {% if not has_data %}disabled{% endif %}>
+                        <i class="fas fa-calculator me-2"></i>
+                        Calculate Analysis
+                    </button>
+                    
+                    <button class="btn btn-primary" id="btnExport" disabled>
+                        <i class="fas fa-file-excel me-2"></i>
+                        Export to Excel
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-2"></i>
+                About This Analysis
+            </div>
+            <div class="card-body">
+                <p class="small mb-3">This analysis calculates:</p>
+                <ul class="small mb-0">
+                    <li class="mb-2"><strong>Market Capacity:</strong> Available job vacancies vs graduates</li>
+                    <li class="mb-2"><strong>Placement Gap:</strong> Actual placement vs market capacity</li>
+                    <li class="mb-2"><strong>Status:</strong> Oversupply, Balanced, or Undersupply</li>
+                    <li><strong>Insights:</strong> Actionable recommendations</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="fas fa-tag me-2"></i>
+                Status Legend
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <span class="badge bg-danger me-2">OVERSUPPLY</span>
+                    <small>Gap > +20%</small>
+                </div>
+                <div class="mb-2">
+                    <span class="badge bg-warning text-dark me-2">HIGH EXTERNAL</span>
+                    <small>Gap +10% to +20%</small>
+                </div>
+                <div class="mb-2">
+                    <span class="badge bg-success me-2">BALANCED</span>
+                    <small>Gap -10% to +10%</small>
+                </div>
+                <div class="mb-2">
+                    <span class="badge bg-info me-2">UNDERSUPPLY</span>
+                    <small>Gap -20% to -10%</small>
+                </div>
+                <div class="mb-2">
+                    <span class="badge bg-primary me-2">CRITICAL</span>
+                    <small>Gap < -20%</small>
+                </div>
+                <div>
+                    <span class="badge bg-secondary me-2">UNMATCHED</span>
+                    <small>No training match</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Panel: Results -->
+    <div class="col-lg-9">
+        <!-- Summary Cards -->
+        <div class="row g-3 mb-4" id="summaryCards" style="display: none;">
+            <div class="col-md-4">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h4 class="mb-1" id="totalGraduates">0</h4>
+                        <small>Total Graduates</small>
+                        <hr class="my-2 border-light">
+                        <small>Placed: <strong id="totalPlaced">0</strong> (<span id="overallPlacementRate">0%</span>)</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h4 class="mb-1" id="totalVacancies">0</h4>
+                        <small>Total Market Vacancies</small>
+                        <hr class="my-2 border-light">
+                        <small>Capacity: <strong id="overallMarketCapacity">0%</strong></small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h4 class="mb-1" id="overallGap">0%</h4>
+                        <small>Overall Gap</small>
+                        <hr class="my-2 border-light">
+                        <small id="gapInterpretation">-</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Results Table -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>
+                    <i class="fas fa-table me-2"></i>
+                    Program Analysis Results
+                </span>
+                <span class="badge bg-light text-dark" id="resultCount">0 programs</span>
+            </div>
+            <div class="card-body">
+                <div id="resultsContainer">
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-chart-line fa-3x mb-3 opacity-50"></i>
+                        <p>Click "Calculate Analysis" to generate market analysis</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Unmatched Programs Alert -->
+        <div class="alert alert-warning mt-3" id="unmatchedAlert" style="display: none;">
+            <h6 class="alert-heading">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Unmatched Programs
+            </h6>
+            <div id="unmatchedList"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Program Detail Modal -->
+<div class="modal fade" id="programDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-graduation-cap me-2"></i>
+                    <span id="modalProgramName">Program Details</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Details will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/analysis.js') }}"></script>
+{% endblock %}

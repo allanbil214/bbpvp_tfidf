@@ -1,5 +1,11 @@
 /* BBPVP Job Matching System - Main Styles */
 
+@media (min-width: 1400px) {
+    .container {
+        max-width: 1600px;
+    }
+}
+
 :root {
     --primary-color: #2563eb;
     --secondary-color: #64748b;

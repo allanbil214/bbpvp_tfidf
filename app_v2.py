@@ -117,7 +117,7 @@ class BBPVPMatchingGUI:
                 "visible": True,
                 "builder": self.create_import_tab
             },
-            "view": {  # NEW
+            "view": {
                 "title": "2. View Data",
                 "visible": True,
                 "builder": self.create_view_data_tab
@@ -136,6 +136,11 @@ class BBPVPMatchingGUI:
                 "title": "5. Recommendations",
                 "visible": True,
                 "builder": self.create_recommendations_tab
+            },
+            "analysis": {
+                "title": "6. Market Analysis",
+                "visible": True,
+                "builder": self.create_analysis_tab
             },
             "results": {
                 "title": "7. Results & Analysis (WIP)",
@@ -928,7 +933,602 @@ class BBPVPMatchingGUI:
         
         # Initial display
         self.update_recommendation_display()
+
+    def create_analysis_tab(self, parent):
+        """Create market analysis tab"""
+        # Main frame
+        main_frame = ttk.Frame(parent, padding="10")
+        main_frame.pack(fill='both', expand=True)
         
+        # Left panel with scrollbar (similar to other tabs)
+        left_container = ttk.Frame(main_frame, width=420)
+        left_container.pack(side='left', fill='y', padx=(0, 10))
+        left_container.pack_propagate(False)
+        
+        style = ttk.Style()
+        bg_color = style.lookup('TFrame', 'background')
+        
+        left_canvas = tk.Canvas(left_container, width=420, bg=bg_color, highlightthickness=0)
+        left_scrollbar = ttk.Scrollbar(left_container, orient="vertical", command=left_canvas.yview)
+        left_frame = ttk.Frame(left_canvas)
+        
+        left_canvas.configure(yscrollcommand=left_scrollbar.set)
+        left_scrollbar.pack(side="right", fill="y")
+        left_canvas.pack(side="left", fill="both", expand=True)
+        canvas_frame = left_canvas.create_window((0, 0), window=left_frame, anchor="nw")
+        
+        def configure_scroll_region(event):
+            left_canvas.configure(scrollregion=left_canvas.bbox("all"))
+        left_frame.bind("<Configure>", configure_scroll_region)
+        
+        def configure_canvas_width(event):
+            left_canvas.itemconfig(canvas_frame, width=event.width)
+        left_canvas.bind("<Configure>", configure_canvas_width)
+        
+        def on_mousewheel(event):
+            left_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        def bind_mousewheel(event):
+            left_canvas.bind_all("<MouseWheel>", on_mousewheel)
+        def unbind_mousewheel(event):
+            left_canvas.unbind_all("<MouseWheel>")
+        left_canvas.bind("<Enter>", bind_mousewheel)
+        left_canvas.bind("<Leave>", unbind_mousewheel)
+        
+        # Title
+        title = ttk.Label(left_frame, text="Market Analysis", font=('Arial', 14, 'bold'))
+        title.pack(pady=10)
+        
+        # Info section
+        info_frame = ttk.LabelFrame(left_frame, text="ℹ️ About", padding="10")
+        info_frame.pack(fill='x', pady=10, padx=5)
+        
+        info_text = tk.Text(info_frame, height=6, wrap=tk.WORD, font=('Arial', 9))
+        info_text.pack(fill='x')
+        info_text.insert(1.0,
+            "Market Analysis compares:\n"
+            "• Realisasi (actual placements)\n"
+            "• Training programs offered\n"
+            "• Job market demand\n\n"
+            "Identifies supply-demand gaps."
+        )
+        info_text.config(state='disabled')
+        
+        # Threshold settings
+        threshold_frame = ttk.LabelFrame(left_frame, text="Threshold Settings", padding="10")
+        threshold_frame.pack(fill='x', pady=10, padx=5)
+
+        # Program Match Threshold
+        ttk.Label(threshold_frame, text="Program Match Threshold:").pack(anchor='w', pady=(5, 2))
+
+        program_container = ttk.Frame(threshold_frame)
+        program_container.pack(fill='x', pady=(0, 10))
+
+        self.program_threshold_scale = ttk.Scale(program_container, from_=0.0, to=1.0, orient='horizontal')
+        self.program_threshold_scale.set(0.30)
+        self.program_threshold_scale.pack(side='left', fill='x', expand=True, padx=(0, 10))
+
+        self.program_threshold_label = ttk.Label(program_container, text="0.30", width=6)
+        self.program_threshold_label.pack(side='right')
+
+        def update_program_label(*args):
+            val = self.program_threshold_scale.get()
+            self.program_threshold_label.config(text=f"{val:.2f}")
+        self.program_threshold_scale.config(command=update_program_label)
+
+        # Job Match Threshold
+        ttk.Label(threshold_frame, text="Job Match Threshold:").pack(anchor='w', pady=(5, 2))
+
+        job_container = ttk.Frame(threshold_frame)
+        job_container.pack(fill='x', pady=(0, 5))
+
+        self.job_threshold_scale = ttk.Scale(job_container, from_=0.0, to=1.0, orient='horizontal')
+        self.job_threshold_scale.set(0.30)
+        self.job_threshold_scale.pack(side='left', fill='x', expand=True, padx=(0, 10))
+
+        self.job_threshold_label = ttk.Label(job_container, text="0.30", width=6)
+        self.job_threshold_label.pack(side='right')
+
+        def update_job_label(*args):
+            val = self.job_threshold_scale.get()
+            self.job_threshold_label.config(text=f"{val:.2f}")
+        self.job_threshold_scale.config(command=update_job_label)
+        
+        # Calculate button
+        calc_frame = ttk.LabelFrame(left_frame, text="Actions", padding="10")
+        calc_frame.pack(fill='x', pady=10, padx=5)
+        
+        ttk.Button(calc_frame, text="📊 Calculate Market Analysis", 
+                command=self.calculate_market_analysis,
+                style='Accent.TButton', width=35).pack(pady=5)
+        
+        ttk.Button(calc_frame, text="💾 Export to Excel", 
+                command=self.export_market_analysis,
+                width=35).pack(pady=5)
+        
+        # Requirements checklist
+        req_frame = ttk.LabelFrame(left_frame, text="✅ Requirements", padding="10")
+        req_frame.pack(fill='x', pady=10, padx=5)
+        
+        req_text = tk.Text(req_frame, height=8, wrap=tk.WORD, font=('Arial', 9))
+        req_text.pack(fill='x')
+        req_text.insert(1.0,
+            "Before running analysis:\n\n"
+            "1. ✓ Import all 3 datasets\n"
+            "   (Training, Jobs, Realisasi)\n"
+            "2. ✓ Preprocess data\n"
+            "3. ✓ Calculate TF-IDF similarity\n\n"
+            "Then run Market Analysis!"
+        )
+        req_text.config(state='disabled')
+        
+        # Right panel - Results
+        right_frame = ttk.Frame(main_frame)
+        right_frame.pack(side='left', fill='both', expand=True)
+        
+        ttk.Label(right_frame, text="Market Analysis Results", 
+                font=('Arial', 12, 'bold')).pack(pady=5)
+        
+        self.analysis_output = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, 
+                                                        font=('Consolas', 9))
+        self.analysis_output.pack(fill='both', expand=True)
+
+    def calculate_market_analysis(self):
+        """Calculate market analysis matching realisasi -> training -> jobs"""
+        self.analysis_output.delete(1.0, tk.END)
+        
+        # Check prerequisites
+        if self.df_realisasi is None:
+            messagebox.showwarning("Warning", "Realisasi data not loaded!")
+            return
+        
+        if self.df_pelatihan is None or self.df_lowongan is None:
+            messagebox.showwarning("Warning", "Training or Job data not loaded!")
+            return
+        
+        if not hasattr(self, 'similarity_matrix') or self.similarity_matrix is None:
+            messagebox.showwarning("Warning", 
+                                "Please calculate similarity matrix first!\n"
+                                "Go to TF-IDF tab and click 'Calculate All Documents'")
+            return
+        
+        # Check if data is preprocessed
+        if 'preprocessed_text' not in self.df_pelatihan.columns or 'preprocessed_text' not in self.df_lowongan.columns:
+            messagebox.showwarning("Warning",
+                                "Data not preprocessed!\n"
+                                "Go to Preprocessing tab and click 'Process All Data'")
+            return
+        
+        # Get thresholds
+        program_threshold = float(self.program_threshold_scale.get())
+        job_threshold = float(self.job_threshold_scale.get())
+        
+        self.log_message("=" * 120, self.analysis_output)
+        self.log_message("CALCULATING MARKET ANALYSIS", self.analysis_output)
+        self.log_message("=" * 120, self.analysis_output)
+        self.log_message(f"\n⚙️ Configuration:", self.analysis_output)
+        self.log_message(f"   Program Similarity Threshold: {program_threshold:.2f}", self.analysis_output)
+        self.log_message(f"   Job Similarity Threshold: {job_threshold:.2f}\n", self.analysis_output)
+        
+        def analyze():
+            try:
+                from sklearn.feature_extraction.text import TfidfVectorizer
+                from sklearn.metrics.pairwise import cosine_similarity
+                
+                # Step 1: Preprocess realisasi program names
+                self.log_message("📝 Step 1/3: Preprocessing realisasi program names...", self.analysis_output)
+                df_real_copy = self.df_realisasi.copy()
+                
+                # Preprocess realisasi
+                df_real_copy['text_features'] = df_real_copy['Program Pelatihan'].fillna('')
+                df_real_copy['normalized'] = df_real_copy['text_features'].apply(self.normalize_text)
+                df_real_copy['no_stopwords'] = df_real_copy['normalized'].apply(self.remove_stopwords)
+                df_real_copy['tokens'] = df_real_copy['no_stopwords'].apply(self.tokenize_text)
+                df_real_copy['stemmed_tokens'] = df_real_copy['tokens'].apply(self.stem_tokens)
+                df_real_copy['preprocessed_text'] = df_real_copy['stemmed_tokens'].apply(lambda x: ' '.join(x))
+                
+                self.log_message(f"   ✓ Preprocessed {len(df_real_copy)} realisasi programs\n", self.analysis_output)
+                
+                # Step 2: Match realisasi programs to training programs
+                self.log_message("🔗 Step 2/3: Matching realisasi programs to training programs...", self.analysis_output)
+                self.log_message(f"   Program similarity threshold: {program_threshold:.2f}", self.analysis_output)
+                
+                # Calculate similarity between realisasi and training programs
+                all_texts = list(df_real_copy['preprocessed_text']) + list(self.df_pelatihan['preprocessed_text'])
+                
+                vectorizer = TfidfVectorizer()
+                tfidf_matrix = vectorizer.fit_transform(all_texts)
+                
+                n_realisasi = len(df_real_copy)
+                realisasi_vectors = tfidf_matrix[:n_realisasi]
+                training_vectors = tfidf_matrix[n_realisasi:]
+                
+                # Calculate similarity matrix: realisasi x training
+                realisasi_to_training_sim = cosine_similarity(realisasi_vectors, training_vectors)
+                
+                self.log_message(f"   ✓ Calculated realisasi-to-training similarities\n", self.analysis_output)
+                
+                # Step 3: Get existing training-to-jobs similarity
+                self.log_message("💼 Step 3/3: Using existing training-to-jobs similarity matrix...", self.analysis_output)
+                training_to_jobs_sim = self.similarity_matrix
+                
+                self.log_message(f"   ✓ Loaded similarity matrix: {training_to_jobs_sim.shape}", self.analysis_output)
+                self.log_message(f"   Job similarity threshold: {job_threshold:.2f}\n", self.analysis_output)
+                
+                # Step 4: Calculate market analysis for each realisasi program
+                self.log_message("📊 Step 4/4: Calculating market analysis...\n", self.analysis_output)
+                
+                results = []
+                job_details_list = []
+                unmatched_programs = []
+                
+                # Table header
+                self.log_message("=" * 120, self.analysis_output)
+                self.log_message(
+                    f"┌{'─' * 45}┬{'─' * 12}┬{'─' * 12}┬{'─' * 12}┬{'─' * 12}┬{'─' * 12}┬{'─' * 10}┐",
+                    self.analysis_output
+                )
+                self.log_message(
+                    f"│ {'Program Name':<43} │ {'Graduates':<10} │ {'Placed':<10} │ {'Place %':<10} │ {'Jobs':<10} │ {'Capacity':<10} │ {'Status':<8} │",
+                    self.analysis_output
+                )
+                self.log_message(
+                    f"├{'─' * 45}┼{'─' * 12}┼{'─' * 12}┼{'─' * 12}┼{'─' * 12}┼{'─' * 12}┼{'─' * 10}┤",
+                    self.analysis_output
+                )
+                
+                for real_idx, real_row in df_real_copy.iterrows():
+                    program_name = real_row['Program Pelatihan']
+                    
+                    # Skip NaN program names (like the TOTAL row)
+                    if pd.isna(program_name):
+                        continue
+                    
+                    graduates = int(real_row['Jumlah Peserta'])
+                    placed = int(real_row['Penempatan'])
+                    
+                    # Parse placement rate correctly
+                    placement_rate_str = str(real_row['% Penempatan'])
+                    if '%' in placement_rate_str:
+                        # Already in percentage format (e.g., "50.00%")
+                        placement_rate = float(placement_rate_str.replace('%', '').strip())
+                    else:
+                        # Decimal format (e.g., 0.5) - convert to percentage
+                        try:
+                            placement_rate = float(placement_rate_str) * 100
+                        except:
+                            placement_rate = 0.0
+                    
+                    # Find best matching training program
+                    similarities_to_training = realisasi_to_training_sim[real_idx, :]
+                    best_training_idx = int(np.argmax(similarities_to_training))
+                    best_training_score = float(similarities_to_training[best_training_idx])
+                    
+                    training_match_name = self.df_pelatihan.iloc[best_training_idx]['PROGRAM PELATIHAN']
+                    
+                    # Get job similarities for this training program
+                    job_similarities = training_to_jobs_sim[best_training_idx, :]
+                    
+                    if best_training_score < program_threshold:
+                        # Program doesn't match well with any training program
+                        unmatched_programs.append({
+                            'program_name': program_name,
+                            'best_match': training_match_name,
+                            'confidence': round(best_training_score * 100, 2)
+                        })
+                        
+                        prog_display = program_name[:41] + ".." if len(program_name) > 43 else program_name
+                        self.log_message(
+                            f"│ {prog_display:<43} │ {graduates:>10} │ {placed:>10} │ {placement_rate:>9.1f}% │ {0:>10} │ {0.0:>9.1f}% │ {'UNMATCH':<8} │",
+                            self.analysis_output
+                        )
+                        
+                        results.append({
+                            'program_name': program_name,
+                            'training_match': training_match_name,
+                            'confidence': round(best_training_score * 100, 2),
+                            'graduates': graduates,
+                            'placed': placed,
+                            'placement_rate': placement_rate,
+                            'matching_jobs': 0,
+                            'total_vacancies': 0,
+                            'market_capacity': 0.0,
+                            'gap': placement_rate - 0.0,
+                            'status': 'UNMATCHED',
+                            'top_jobs': []
+                        })
+                        continue
+                    
+                    # Find matching jobs (above threshold)
+                    matching_job_indices = [i for i, sim in enumerate(job_similarities) 
+                                        if sim >= job_threshold]
+                    
+                    # Calculate total vacancies and get job details
+                    total_vacancies = 0
+                    top_jobs = []
+                    
+                    for job_idx in matching_job_indices:
+                        job_row = self.df_lowongan.iloc[job_idx]
+                        vacancy_count = int(job_row.get('Perkiraan Lowongan', 1))
+                        total_vacancies += vacancy_count
+                        
+                        top_jobs.append({
+                            'job_name': job_row['Nama Jabatan'],
+                            'similarity': round(float(job_similarities[job_idx]) * 100, 2),
+                            'vacancies': vacancy_count
+                        })
+                    
+                    # Sort jobs by similarity
+                    top_jobs.sort(key=lambda x: x['similarity'], reverse=True)
+                    
+                    # Calculate metrics
+                    market_capacity = (total_vacancies / graduates * 100) if graduates > 0 else 0.0
+                    gap = placement_rate - market_capacity
+                    
+                    # Classify status
+                    if gap > 20:
+                        status = 'OVERSUPPLY'
+                    elif gap > 10:
+                        status = 'HIGH_EXTERNAL'
+                    elif gap >= -10:
+                        status = 'BALANCED'
+                    elif gap >= -20:
+                        status = 'UNDERSUPPLY'
+                    else:
+                        status = 'CRITICAL_UNDERSUPPLY'
+                    
+                    prog_display = program_name[:41] + ".." if len(program_name) > 43 else program_name
+                    self.log_message(
+                        f"│ {prog_display:<43} │ {graduates:>10} │ {placed:>10} │ {placement_rate:>9.1f}% │ {len(matching_job_indices):>10} │ {market_capacity:>9.1f}% │ {status[:8]:<8} │",
+                        self.analysis_output
+                    )
+                    
+                    results.append({
+                        'program_name': program_name,
+                        'training_match': training_match_name,
+                        'confidence': round(best_training_score * 100, 2),
+                        'graduates': graduates,
+                        'placed': placed,
+                        'placement_rate': placement_rate,
+                        'matching_jobs': len(matching_job_indices),
+                        'total_vacancies': total_vacancies,
+                        'market_capacity': round(market_capacity, 2),
+                        'gap': round(gap, 2),
+                        'status': status,
+                        'top_jobs': top_jobs[:10]  # Top 10 jobs
+                    })
+                    
+                    # Store job details for export
+                    for job in top_jobs[:10]:
+                        job_details_list.append({
+                            'program_name': program_name,
+                            'status': status,
+                            'job_name': job['job_name'],
+                            'similarity': job['similarity'],
+                            'vacancies': job['vacancies']
+                        })
+                
+                # Table footer
+                self.log_message(
+                    f"└{'─' * 45}┴{'─' * 12}┴{'─' * 12}┴{'─' * 12}┴{'─' * 12}┴{'─' * 12}┴{'─' * 10}┘",
+                    self.analysis_output
+                )
+                
+                # Calculate summary statistics
+                total_graduates = sum(r['graduates'] for r in results)
+                total_placed = sum(r['placed'] for r in results)
+                total_vacancies = sum(r['total_vacancies'] for r in results)
+                
+                overall_placement_rate = (total_placed / total_graduates * 100) if total_graduates > 0 else 0
+                overall_market_capacity = (total_vacancies / total_graduates * 100) if total_graduates > 0 else 0
+                overall_gap = overall_placement_rate - overall_market_capacity
+                
+                summary = {
+                    'total_programs': len(results),
+                    'total_graduates': total_graduates,
+                    'total_placed': total_placed,
+                    'total_vacancies': total_vacancies,
+                    'overall_placement_rate': round(overall_placement_rate, 2),
+                    'overall_market_capacity': round(overall_market_capacity, 2),
+                    'overall_gap': round(overall_gap, 2),
+                    'matched_programs': len([r for r in results if r['status'] != 'UNMATCHED']),
+                    'unmatched_programs': len(unmatched_programs)
+                }
+                
+                # Display summary
+                self.log_message("\n" + "=" * 120, self.analysis_output)
+                self.log_message("CALCULATION COMPLETE", self.analysis_output)
+                self.log_message("=" * 120, self.analysis_output)
+                self.log_message(f"\n✓ Total Programs: {len(results)}", self.analysis_output)
+                self.log_message(f"✓ Matched: {summary['matched_programs']}", self.analysis_output)
+                self.log_message(f"✓ Unmatched: {summary['unmatched_programs']}", self.analysis_output)
+                self.log_message(f"✓ Total Graduates: {total_graduates:,}", self.analysis_output)
+                self.log_message(f"✓ Total Placed: {total_placed:,} ({overall_placement_rate:.2f}%)", self.analysis_output)
+                self.log_message(f"✓ Total Vacancies: {total_vacancies:,}", self.analysis_output)
+                self.log_message(f"✓ Market Capacity: {overall_market_capacity:.2f}%", self.analysis_output)
+                self.log_message(f"✓ Overall Gap: {overall_gap:.2f}%", self.analysis_output)
+                self.log_message("=" * 120, self.analysis_output)
+                
+                self.log_message(f"\n✅ Analysis Complete! You can now export the results.", self.analysis_output)
+                
+                # Store results
+                self.market_analysis_results = results
+                self.market_analysis_jobs = job_details_list
+                self.market_analysis_summary = summary
+                self.market_analysis_unmatched = unmatched_programs
+                
+                messagebox.showinfo("Complete", 
+                                f"Market analysis completed!\n\n"
+                                f"Programs analyzed: {len(results)}\n"
+                                f"Matched: {summary['matched_programs']}\n"
+                                f"Unmatched: {summary['unmatched_programs']}\n\n"
+                                f"Ready to export!")
+            
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                self.log_message(f"\n✗ Error: {str(e)}", self.analysis_output)
+                messagebox.showerror("Error", f"Calculation failed:\n{str(e)}")
+        
+        # Run in thread to prevent UI freeze
+        threading.Thread(target=analyze, daemon=True).start()
+
+    def export_market_analysis(self):
+        """Export market analysis results to Excel with enhanced formatting"""
+        if not hasattr(self, 'market_analysis_results'):
+            messagebox.showwarning("Warning", "No analysis results to export!")
+            return
+        
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[("Excel files", "*.xlsx")],
+            initialfile="market_analysis_report.xlsx"
+        )
+        
+        if not filename:
+            return
+        
+        try:
+            results = self.market_analysis_results
+            
+            with pd.ExcelWriter(filename, engine='openpyxl') as writer:
+                # Sheet 1: Summary Statistics
+                summary_data = {
+                    'Metric': [
+                        'Total Programs Analyzed',
+                        'Programs Matched',
+                        'Programs Unmatched',
+                        'Total Graduates',
+                        'Total Placed',
+                        'Overall Placement Rate (%)',
+                        'Total Market Vacancies',
+                        'Overall Market Capacity (%)',
+                        'Overall Gap (%)',
+                    ],
+                    'Value': [
+                        len(results),
+                        len([r for r in results if r['status'] != 'UNMATCHED']),
+                        len([r for r in results if r['status'] == 'UNMATCHED']),
+                        sum(r['graduates'] for r in results),
+                        sum(r['placed'] for r in results),
+                        round((sum(r['placed'] for r in results) / sum(r['graduates'] for r in results) * 100) 
+                            if sum(r['graduates'] for r in results) > 0 else 0, 2),
+                        sum(r['total_vacancies'] for r in results),
+                        round((sum(r['total_vacancies'] for r in results) / sum(r['graduates'] for r in results) * 100) 
+                            if sum(r['graduates'] for r in results) > 0 else 0, 2),
+                        round((sum(r['placed'] for r in results) / sum(r['graduates'] for r in results) * 100) 
+                            if sum(r['graduates'] for r in results) > 0 else 0, 2) - 
+                        round((sum(r['total_vacancies'] for r in results) / sum(r['graduates'] for r in results) * 100) 
+                            if sum(r['graduates'] for r in results) > 0 else 0, 2),
+                    ]
+                }
+                summary_df = pd.DataFrame(summary_data)
+                summary_df.to_excel(writer, sheet_name='Summary', index=False)
+                
+                # Sheet 2: Program Analysis (Main Table)
+                analysis_data = []
+                for result in results:
+                    analysis_data.append({
+                        'Program Name': result['program_name'],
+                        'Training Match': result.get('training_match', 'N/A'),
+                        'Match Confidence (%)': result.get('confidence', 0),
+                        'Graduates': result['graduates'],
+                        'Placed': result['placed'],
+                        'Placement Rate (%)': round(result['placement_rate'], 2),
+                        'Unplaced': result['graduates'] - result['placed'],
+                        'Matching Jobs': result['matching_jobs'],
+                        'Total Vacancies': result['total_vacancies'],
+                        'Market Capacity (%)': round(result['market_capacity'], 2),
+                        'Gap (%)': round(result['gap'], 2),
+                        'Status': result['status'],
+                    })
+                
+                analysis_df = pd.DataFrame(analysis_data)
+                analysis_df.to_excel(writer, sheet_name='Program Analysis', index=False)
+                
+                # Auto-adjust column widths for Program Analysis
+                worksheet = writer.sheets['Program Analysis']
+                for idx, col in enumerate(analysis_df.columns):
+                    max_length = max(
+                        analysis_df[col].astype(str).apply(len).max(),
+                        len(col)
+                    ) + 2
+                    worksheet.column_dimensions[chr(65 + idx)].width = min(max_length, 50)
+                
+                # Sheet 3: Matching Jobs Detail (if available)
+                if hasattr(self, 'market_analysis_jobs'):
+                    job_details = []
+                    for job_data in self.market_analysis_jobs:
+                        job_details.append({
+                            'Program Name': job_data['program_name'],
+                            'Program Status': job_data['status'],
+                            'Job Name': job_data['job_name'],
+                            'Similarity (%)': job_data['similarity'],
+                            'Vacancies': job_data['vacancies']
+                        })
+                    
+                    if job_details:
+                        jobs_df = pd.DataFrame(job_details)
+                        jobs_df.to_excel(writer, sheet_name='Matching Jobs', index=False)
+                        
+                        worksheet = writer.sheets['Matching Jobs']
+                        for idx, col in enumerate(jobs_df.columns):
+                            max_length = max(
+                                jobs_df[col].astype(str).apply(len).max(),
+                                len(col)
+                            ) + 2
+                            worksheet.column_dimensions[chr(65 + idx)].width = min(max_length, 50)
+                
+                # Sheet 4: Status Distribution
+                status_counts = {}
+                for result in results:
+                    status = result['status']
+                    status_counts[status] = status_counts.get(status, 0) + 1
+                
+                status_data = {
+                    'Status': list(status_counts.keys()),
+                    'Count': list(status_counts.values()),
+                    'Percentage': [round((count / len(results)) * 100, 2) 
+                                for count in status_counts.values()]
+                }
+                status_df = pd.DataFrame(status_data)
+                status_df = status_df.sort_values('Count', ascending=False)
+                status_df.to_excel(writer, sheet_name='Status Distribution', index=False)
+                
+                # Sheet 5: Unmatched Programs (if any)
+                unmatched = [r for r in results if r['status'] == 'UNMATCHED']
+                if unmatched:
+                    unmatched_data = []
+                    for item in unmatched:
+                        unmatched_data.append({
+                            'Program Name': item['program_name'],
+                            'Best Training Match': item.get('training_match', 'N/A'),
+                            'Confidence (%)': item.get('confidence', 0),
+                            'Reason': 'Confidence below threshold'
+                        })
+                    
+                    unmatched_df = pd.DataFrame(unmatched_data)
+                    unmatched_df.to_excel(writer, sheet_name='Unmatched Programs', index=False)
+                    
+                    worksheet = writer.sheets['Unmatched Programs']
+                    for idx, col in enumerate(unmatched_df.columns):
+                        max_length = max(
+                            unmatched_df[col].astype(str).apply(len).max(),
+                            len(col)
+                        ) + 2
+                        worksheet.column_dimensions[chr(65 + idx)].width = min(max_length, 50)
+            
+            messagebox.showinfo("Success", 
+                            f"Market Analysis exported successfully!\n\n"
+                            f"File: {filename}\n"
+                            f"Sheets: Summary, Program Analysis, Status Distribution, "
+                            f"{'Matching Jobs, ' if hasattr(self, 'market_analysis_jobs') else ''}"
+                            f"{'Unmatched Programs' if unmatched else ''}")
+        
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            messagebox.showerror("Error", f"Export failed:\n{str(e)}")
+
     def update_recommendation_display(self):
         """Update the recommendation display based on selected mode"""
         # Clear current content
