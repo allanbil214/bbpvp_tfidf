@@ -26,7 +26,8 @@ class DataStore:
         self.similarity_matrix = None
         self.current_experiment_id = None
         self.match_thresholds = DEFAULT_MATCH_THRESHOLDS.copy()
-        
+        self.jaccard_matrix = None
+
         # Cache setup
         self.cache_dir = CACHE_DIR
         if CACHE_ENABLED:
@@ -41,6 +42,7 @@ class DataStore:
         self.df_realisasi = None
         self.similarity_matrix = None
         self.current_experiment_id = None
+        self.jaccard_matrix = None
         self.match_thresholds = DEFAULT_MATCH_THRESHOLDS.copy()
     
     def has_training_data(self):

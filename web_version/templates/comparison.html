@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Cosine vs Jaccard - BBPVP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-balance-scale text-primary me-3"></i>
+        Similarity Method Comparison
+    </h1>
+    <p class="page-subtitle">Compare Cosine Similarity vs Jaccard Similarity results</p>
+</div>
+
+{% if not has_data %}
+<div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>Warning:</strong> Both similarity matrices must be calculated first. 
+    Please calculate TF-IDF (Cosine) and Jaccard similarities before using this comparison.
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <div class="col-lg-3">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-sliders-h me-2"></i>
+                Configuration
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Comparison Mode</label>
+                    <select class="form-select" id="comparisonMode" {% if not has_data %}disabled{% endif %}>
+                        <option value="all">All Pairs (Non-Zero)</option>
+                        <option value="single">Single Pair</option>
+                    </select>
+                </div>
+                
+                <div id="singlePairConfig" style="display: none;">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Training Program</label>
+                        <select class="form-select" id="trainingSelect" {% if not has_data %}disabled{% endif %}>
+                            <option value="">-- Select --</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Job Position</label>
+                        <select class="form-select" id="jobSelect" {% if not has_data %}disabled{% endif %}>
+                            <option value="">-- Select --</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Minimum Threshold</label>
+                    <input type="range" class="form-range" id="minThreshold" 
+                           min="0" max="100" value="1" step="1" {% if not has_data %}disabled{% endif %}>
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted">0%</small>
+                        <small class="fw-bold text-primary" id="thresholdValue">1%</small>
+                        <small class="text-muted">100%</small>
+                    </div>
+                    <small class="text-muted">Only show pairs above this threshold</small>
+                </div>
+                
+                <button class="btn btn-primary w-100 mb-2" id="btnCompare" {% if not has_data %}disabled{% endif %}>
+                    <i class="fas fa-equals me-2"></i>
+                    Generate Comparison
+                </button>
+                
+                <button class="btn btn-success w-100" id="btnExport" disabled>
+                    <i class="fas fa-file-excel me-2"></i>
+                    Export to Excel
+                </button>
+            </div>
+        </div>
+        
+        <div class="card mt-4" id="statsCard" style="display: none;">
+            <div class="card-header">
+                <i class="fas fa-chart-line me-2"></i>
+                Statistics
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="small text-muted">Total Comparisons</label>
+                    <h4 id="totalComparisons">0</h4>
+                </div>
+                <div class="mb-3">
+                    <label class="small text-muted">Avg Cosine</label>
+                    <h5 id="avgCosine">0%</h5>
+                </div>
+                <div class="mb-3">
+                    <label class="small text-muted">Avg Jaccard</label>
+                    <h5 id="avgJaccard">0%</h5>
+                </div>
+                <div class="mb-3">
+                    <label class="small text-muted">Avg Difference</label>
+                    <h5 id="avgDifference">0%</h5>
+                </div>
+                <div>
+                    <label class="small text-muted">Correlation</label>
+                    <h5 id="correlation">0.00</h5>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-9">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>
+                    <i class="fas fa-table me-2"></i>
+                    Comparison Results
+                </span>
+                <span class="badge bg-light text-dark" id="resultCount">0 pairs</span>
+            </div>
+            <div class="card-body">
+                <div id="resultsContainer">
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-balance-scale fa-3x mb-3 opacity-50"></i>
+                        <p>Click "Generate Comparison" to see results</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/comparison.js') }}"></script>
+{% endblock %}

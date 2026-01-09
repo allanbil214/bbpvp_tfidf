@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Jaccard Similarity - BBPVP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-project-diagram text-success me-3"></i>
+        Jaccard Similarity
+    </h1>
+    <p class="page-subtitle">Calculate Jaccard coefficient for similarity comparison</p>
+</div>
+
+{% if not has_data %}
+<div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>Warning:</strong> Data not ready yet. 
+    Please complete data import and preprocessing first.
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-sliders-h me-2"></i>
+                Document Selection
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Training Program</label>
+                    <select class="form-select" id="trainingSelect" {% if not has_data %}disabled{% endif %}>
+                        <option value="">-- Select Training Program --</option>
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Job Position</label>
+                    <select class="form-select" id="jobSelect" {% if not has_data %}disabled{% endif %}>
+                        <option value="">-- Select Job Position --</option>
+                    </select>
+                </div>
+                
+                <button class="btn btn-primary w-100 mb-2" id="btnLoadDocuments" {% if not has_data %}disabled{% endif %}>
+                    <i class="fas fa-download me-2"></i>
+                    Load Document Options
+                </button>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="fas fa-list-ol me-2"></i>
+                Calculation Steps
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" id="btnStep1" disabled>
+                        <i class="fas fa-tags me-2"></i>
+                        1. Show Tokens & Sets
+                    </button>
+                    <button class="btn btn-outline-primary" id="btnStep2" disabled>
+                        <i class="fas fa-intersection me-2"></i>
+                        2. Calculate Intersection
+                    </button>
+                    <button class="btn btn-outline-primary" id="btnStep3" disabled>
+                        <i class="fas fa-union me-2"></i>
+                        3. Calculate Union
+                    </button>
+                    <button class="btn btn-outline-primary" id="btnStep4" disabled>
+                        <i class="fas fa-calculator me-2"></i>
+                        4. Calculate Jaccard
+                    </button>
+                    <button class="btn btn-outline-info" id="btnStep5" disabled>
+                        <i class="fas fa-stream me-2"></i>
+                        Show All Steps
+                    </button>
+                </div>
+                
+                <hr class="my-3">
+                
+                <button class="btn btn-success w-100" id="btnCalculateAll" {% if not has_data %}disabled{% endif %}>
+                    <i class="fas fa-rocket me-2"></i>
+                    Calculate All Documents
+                </button>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-2"></i>
+                About Jaccard Similarity
+            </div>
+            <div class="card-body">
+                <p class="small mb-2"><strong>Formula:</strong></p>
+                <div class="alert alert-light text-center mb-3">
+                    <code>J(A,B) = |A ∩ B| / |A ∪ B|</code>
+                </div>
+                <p class="small mb-2"><strong>Where:</strong></p>
+                <ul class="small mb-0">
+                    <li>A ∩ B = Intersection (common terms)</li>
+                    <li>A ∪ B = Union (all unique terms)</li>
+                    <li>Result: 0 to 1 (0% to 100%)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>
+                    <i class="fas fa-chart-bar me-2"></i>
+                    <span id="outputTitle">Jaccard Calculation Output</span>
+                </span>
+                <button class="btn btn-sm btn-outline-light" id="btnClearOutput" style="display: none;">
+                    <i class="fas fa-eraser me-1"></i>
+                    Clear
+                </button>
+            </div>
+            <div class="card-body" style="min-height: 600px; max-height: 800px; overflow-y: auto;">
+                <div id="calculationOutput">
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-project-diagram fa-3x mb-3 opacity-50"></i>
+                        <p>Select documents and click a step to begin</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4" id="statsCard" style="display: none;">
+            <div class="card-header">
+                <i class="fas fa-chart-pie me-2"></i>
+                Jaccard Statistics
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-primary mb-1" id="avgJaccard">-</h4>
+                                <small class="text-muted">Average</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-success mb-1" id="maxJaccard">-</h4>
+                                <small class="text-muted">Maximum</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-danger mb-1" id="minJaccard">-</h4>
+                                <small class="text-muted">Minimum</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-info mb-1" id="nonZeroPercent">-</h4>
+                                <small class="text-muted">Non-Zero %</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/jaccard.js') }}"></script>
+{% endblock %}
