@@ -143,9 +143,19 @@ class BBPVPMatchingGUI:
                 "builder": self.create_analysis_tab
             },
             "results": {
-                "title": "7. Results & Analysis (WIP)",
+                "title": "x. Results & Analysis (UNUSED)",
                 "visible": False,
                 "builder": self.create_results_tab
+            },
+            "jaccard": {
+                "title": "7. Jaccard Similarity",
+                "visible": True,
+                "builder": self.create_jaccard_tab
+            },
+            "comparison": {
+                "title": "8. Cosine vs Jaccard",
+                "visible": True,
+                "builder": self.create_comparison_tab
             }
         }
         self.create_widgets()
@@ -4550,6 +4560,588 @@ class BBPVPMatchingGUI:
             print("✓ Experiment marked as completed")
         except Error as e:
             print(f"✗ Error completing experiment: {e}")
+
+    # ============================================================================
+    # JACCARD SIMILARITY FUNCTIONS
+    # ============================================================================
+
+    def calculate_jaccard_similarity(self, tokens1, tokens2):
+        """
+        Calculate Jaccard Similarity between two token lists
+        
+        Args:
+            tokens1: List of tokens from document 1
+            tokens2: List of tokens from document 2
+        
+        Returns:
+            dict with calculation steps and final similarity
+        """
+        # Convert to sets
+        set1 = set(tokens1)
+        set2 = set(tokens2)
+        
+        # Calculate intersection
+        intersection = set1.intersection(set2)
+        intersection_list = sorted(list(intersection))
+        
+        # Calculate union
+        union = set1.union(set2)
+        union_list = sorted(list(union))
+        
+        # Calculate Jaccard similarity
+        if len(union) > 0:
+            jaccard_score = len(intersection) / len(union)
+        else:
+            jaccard_score = 0.0
+        
+        return {
+            'tokens1': tokens1,
+            'tokens2': tokens2,
+            'set1': sorted(list(set1)),
+            'set2': sorted(list(set2)),
+            'intersection': intersection_list,
+            'intersection_count': len(intersection),
+            'union': union_list,
+            'union_count': len(union),
+            'jaccard_similarity': float(jaccard_score)
+        }
+
+    def calculate_jaccard_matrix(self):
+        """
+        Calculate Jaccard similarity matrix for all document pairs
+        
+        Returns:
+            numpy array of shape (n_training, n_jobs)
+        """
+        if self.df_pelatihan is None or self.df_lowongan is None:
+            return None
+        
+        if 'stemmed_tokens' not in self.df_pelatihan.columns:
+            return None
+        
+        n_training = len(self.df_pelatihan)
+        n_jobs = len(self.df_lowongan)
+        
+        jaccard_matrix = np.zeros((n_training, n_jobs))
+        
+        for i in range(n_training):
+            tokens1 = self.df_pelatihan.iloc[i]['stemmed_tokens']
+            for j in range(n_jobs):
+                tokens2 = self.df_lowongan.iloc[j]['stemmed_tokens']
+                result = self.calculate_jaccard_similarity(tokens1, tokens2)
+                jaccard_matrix[i, j] = result['jaccard_similarity']
+        
+        return jaccard_matrix
+
+    # ============================================================================
+    # UI CREATION - Add to create_widgets() tabs_config
+    # ============================================================================
+
+    def create_jaccard_tab(self, parent):
+        """Create Jaccard Similarity tab"""
+        # Main frame with left-right layout
+        main_frame = ttk.Frame(parent, padding="10")
+        main_frame.pack(fill='both', expand=True)
+        
+        # Left panel - Controls
+        left_frame = ttk.Frame(main_frame, width=350)
+        left_frame.pack(side='left', fill='y', padx=(0, 10))
+        left_frame.pack_propagate(False)
+        
+        title = ttk.Label(left_frame, text="Jaccard Similarity", font=('Arial', 14, 'bold'))
+        title.pack(pady=10)
+        
+        # Document selection
+        doc_frame = ttk.LabelFrame(left_frame, text="Select Documents", padding="10")
+        doc_frame.pack(fill='x', pady=10)
+        
+        ttk.Button(doc_frame, text="Load Document Options", 
+                command=self.load_jaccard_document_options, width=30).pack(pady=5)
+
+        ttk.Label(doc_frame, text="Training Program:").pack(anchor='w', pady=2)
+        self.jaccard_pelatihan_combo = ttk.Combobox(doc_frame, state='readonly', width=35)
+        self.jaccard_pelatihan_combo.pack(fill='x', pady=5)
+        
+        ttk.Label(doc_frame, text="Job Position:").pack(anchor='w', pady=2)
+        self.jaccard_lowongan_combo = ttk.Combobox(doc_frame, state='readonly', width=35)
+        self.jaccard_lowongan_combo.pack(fill='x', pady=5)
+        
+        # Step buttons
+        step_frame = ttk.LabelFrame(left_frame, text="Jaccard Steps", padding="10")
+        step_frame.pack(fill='x', pady=10)
+        
+        steps = [
+            ("1. Show Tokens & Sets", lambda: self.show_jaccard_step(1)),
+            ("2. Calculate Intersection", lambda: self.show_jaccard_step(2)),
+            ("3. Calculate Union", lambda: self.show_jaccard_step(3)),
+            ("4. Calculate Jaccard", lambda: self.show_jaccard_step(4)),
+            ("5. Show All Steps", lambda: self.show_jaccard_step(5)),
+        ]
+        
+        for step_name, command in steps:
+            ttk.Button(step_frame, text=step_name, command=command, 
+                    width=30).pack(pady=2)
+        
+        ttk.Separator(step_frame, orient='horizontal').pack(fill='x', pady=8)
+        
+        ttk.Button(step_frame, text="▶ Run All Steps", 
+                command=self.run_all_jaccard_steps,
+                style='Accent.TButton', width=30).pack(pady=5)
+        
+        # Calculate all button
+        ttk.Separator(left_frame, orient='horizontal').pack(fill='x', pady=10)
+        ttk.Button(left_frame, text="Calculate All Documents\n(Full Jaccard Matrix)", 
+                command=self.calculate_all_jaccard_documents,
+                style='Accent.TButton', width=30).pack(pady=10)
+        
+        # Info
+        info_frame = ttk.LabelFrame(left_frame, text="ℹ️ About Jaccard", padding="10")
+        info_frame.pack(fill='x', pady=10)
+        
+        info_text = tk.Text(info_frame, height=6, wrap=tk.WORD, font=('Arial', 9))
+        info_text.pack(fill='x')
+        info_text.insert(1.0, 
+            "Jaccard Similarity Formula:\n"
+            "J(A,B) = |A ∩ B| / |A ∪ B|\n\n"
+            "Where:\n"
+            "• A ∩ B = Intersection (common terms)\n"
+            "• A ∪ B = Union (all unique terms)"
+        )
+        info_text.config(state='disabled')
+        
+        # Right panel - Output
+        right_frame = ttk.Frame(main_frame)
+        right_frame.pack(side='left', fill='both', expand=True)
+        
+        ttk.Label(right_frame, text="Jaccard Calculation Output", 
+                font=('Arial', 12, 'bold')).pack(pady=5)
+        
+        self.jaccard_output = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, 
+                                                    font=('Consolas', 9))
+        self.jaccard_output.pack(fill='both', expand=True)
+
+    def create_comparison_tab(self, parent):
+        """Create Cosine vs Jaccard Comparison tab"""
+        main_frame = ttk.Frame(parent, padding="10")
+        main_frame.pack(fill='both', expand=True)
+        
+        # Left panel - Controls
+        left_frame = ttk.Frame(main_frame, width=350)
+        left_frame.pack(side='left', fill='y', padx=(0, 10))
+        left_frame.pack_propagate(False)
+        
+        title = ttk.Label(left_frame, text="Similarity Comparison", font=('Arial', 14, 'bold'))
+        title.pack(pady=10)
+        
+        # Configuration
+        config_frame = ttk.LabelFrame(left_frame, text="Configuration", padding="10")
+        config_frame.pack(fill='x', pady=10)
+        
+        ttk.Label(config_frame, text="Comparison Mode:").pack(anchor='w', pady=3)
+        self.comparison_mode_var = tk.StringVar(value="all")
+        ttk.Radiobutton(config_frame, text="All Pairs (Non-Zero)", 
+                    variable=self.comparison_mode_var, value="all",
+                    command=self.toggle_comparison_mode).pack(anchor='w', pady=2)
+        ttk.Radiobutton(config_frame, text="Single Pair", 
+                    variable=self.comparison_mode_var, value="single",
+                    command=self.toggle_comparison_mode).pack(anchor='w', pady=2)
+        
+        # Single Pair Selection (initially hidden)
+        self.single_pair_frame = ttk.LabelFrame(left_frame, text="Single Pair Selection", padding="10")
+        self.single_pair_frame.pack(fill='x', pady=10)
+        
+        ttk.Label(self.single_pair_frame, text="Training Program:").pack(anchor='w', pady=2)
+        self.comparison_training_combo = ttk.Combobox(self.single_pair_frame, state='readonly', width=35)
+        self.comparison_training_combo.pack(fill='x', pady=5)
+        
+        ttk.Label(self.single_pair_frame, text="Job Position:").pack(anchor='w', pady=2)
+        self.comparison_job_combo = ttk.Combobox(self.single_pair_frame, state='readonly', width=35)
+        self.comparison_job_combo.pack(fill='x', pady=5)
+        
+        # Initially hide single pair frame
+        self.single_pair_frame.pack_forget()
+        
+        ttk.Label(config_frame, text="Minimum Threshold:").pack(anchor='w', pady=3)
+        threshold_frame = ttk.Frame(config_frame)
+        threshold_frame.pack(fill='x', pady=5)
+        
+        self.comparison_threshold_var = tk.DoubleVar(value=0.01)
+        self.comparison_threshold_scale = ttk.Scale(threshold_frame, from_=0.0, to=1.0, 
+                                            variable=self.comparison_threshold_var, 
+                                            orient='horizontal')
+        self.comparison_threshold_scale.pack(side='left', fill='x', expand=True)
+        self.comparison_threshold_label = ttk.Label(threshold_frame, text="0.01", width=6)
+        self.comparison_threshold_label.pack(side='right', padx=5)
+        
+        def update_threshold_label(*args):
+            self.comparison_threshold_label.config(text=f"{self.comparison_threshold_var.get():.2f}")
+        self.comparison_threshold_var.trace('w', update_threshold_label)
+        
+        # Buttons
+        button_frame = ttk.LabelFrame(left_frame, text="Actions", padding="10")
+        button_frame.pack(fill='x', pady=10)
+        
+        ttk.Button(button_frame, text="📊 Generate Comparison", 
+                command=self.generate_comparison,
+                style='Accent.TButton', width=30).pack(pady=5)
+        
+        ttk.Button(button_frame, text="💾 Export to Excel", 
+                command=self.export_comparison,
+                width=30).pack(pady=5)
+        
+        # Right panel - Output
+        right_frame = ttk.Frame(main_frame)
+        right_frame.pack(side='left', fill='both', expand=True)
+        
+        ttk.Label(right_frame, text="Comparison Results", 
+                font=('Arial', 12, 'bold')).pack(pady=5)
+        
+        self.comparison_output = scrolledtext.ScrolledText(right_frame, wrap=tk.WORD, 
+                                                        font=('Consolas', 9))
+        self.comparison_output.pack(fill='both', expand=True)
+
+    # ============================================================================
+    # JACCARD STEP FUNCTIONS
+    # ============================================================================
+
+    def load_jaccard_document_options(self):
+        """Load available documents for Jaccard calculation"""
+        if self.df_pelatihan is None or self.df_lowongan is None:
+            messagebox.showwarning("Warning", "Please load and preprocess both datasets first!")
+            return
+        
+        if 'preprocessed_text' not in self.df_pelatihan.columns:
+            messagebox.showwarning("Warning", "Please preprocess the data first!")
+            return
+        
+        # Load pelatihan options
+        pelatihan_options = [f"{i}: {row['PROGRAM PELATIHAN']}" 
+                            for i, row in self.df_pelatihan.iterrows()]
+        self.jaccard_pelatihan_combo['values'] = pelatihan_options
+        if pelatihan_options:
+            self.jaccard_pelatihan_combo.current(0)
+        
+        # Load lowongan options
+        lowongan_options = [f"{i}: {row['Nama Jabatan']}" 
+                        for i, row in self.df_lowongan.iterrows()]
+        self.jaccard_lowongan_combo['values'] = lowongan_options
+        if lowongan_options:
+            self.jaccard_lowongan_combo.current(0)
+        
+        messagebox.showinfo("Success", "Document options loaded!")
+
+    def show_jaccard_step(self, step):
+        """Show specific Jaccard calculation step"""
+        self.jaccard_output.delete(1.0, tk.END)
+        
+        try:
+            pel_idx = int(self.jaccard_pelatihan_combo.get().split(':')[0])
+            low_idx = int(self.jaccard_lowongan_combo.get().split(':')[0])
+        except:
+            messagebox.showerror("Error", "Please select both documents first!")
+            return
+        
+        # Get documents
+        doc1 = self.df_pelatihan.iloc[pel_idx]
+        doc2 = self.df_lowongan.iloc[low_idx]
+        
+        training_name = doc1['PROGRAM PELATIHAN']
+        job_name = doc2['Nama Jabatan']
+        
+        tokens1 = doc1['stemmed_tokens']
+        tokens2 = doc2['stemmed_tokens']
+        
+        # Calculate Jaccard
+        jaccard_result = self.calculate_jaccard_similarity(tokens1, tokens2)
+        
+        self.log_message("=" * 120, self.jaccard_output)
+        self.log_message(f"JACCARD SIMILARITY - STEP {step}", self.jaccard_output)
+        self.log_message("=" * 120, self.jaccard_output)
+        self.log_message(f"\n📄 Document 1: {training_name}", self.jaccard_output)
+        self.log_message(f"📄 Document 2: {job_name}\n", self.jaccard_output)
+        
+        if step == 1:  # Show Tokens & Sets
+            self.log_message("STEP 1: TOKENS & SETS\n", self.jaccard_output)
+            self.log_message(f"Tokens D1 ({len(tokens1)}): {tokens1}\n", self.jaccard_output)
+            self.log_message(f"Unique Set D1 ({len(jaccard_result['set1'])}): {jaccard_result['set1']}\n", self.jaccard_output)
+            self.log_message(f"Tokens D2 ({len(tokens2)}): {tokens2}\n", self.jaccard_output)
+            self.log_message(f"Unique Set D2 ({len(jaccard_result['set2'])}): {jaccard_result['set2']}\n", self.jaccard_output)
+            
+        elif step == 2:  # Intersection
+            self.log_message("STEP 2: INTERSECTION (A ∩ B)\n", self.jaccard_output)
+            self.log_message(f"Set A: {jaccard_result['set1']}\n", self.jaccard_output)
+            self.log_message(f"Set B: {jaccard_result['set2']}\n", self.jaccard_output)
+            self.log_message(f"Intersection: {jaccard_result['intersection']}", self.jaccard_output)
+            self.log_message(f"Count: {jaccard_result['intersection_count']}\n", self.jaccard_output)
+            
+        elif step == 3:  # Union
+            self.log_message("STEP 3: UNION (A ∪ B)\n", self.jaccard_output)
+            self.log_message(f"Set A: {jaccard_result['set1']}\n", self.jaccard_output)
+            self.log_message(f"Set B: {jaccard_result['set2']}\n", self.jaccard_output)
+            self.log_message(f"Union: {jaccard_result['union']}", self.jaccard_output)
+            self.log_message(f"Count: {jaccard_result['union_count']}\n", self.jaccard_output)
+            
+        elif step == 4:  # Calculate Jaccard
+            self.log_message("STEP 4: JACCARD SIMILARITY\n", self.jaccard_output)
+            self.log_message("Formula: J(A,B) = |A ∩ B| / |A ∪ B|\n", self.jaccard_output)
+            self.log_message(f"Intersection Size: {jaccard_result['intersection_count']}", self.jaccard_output)
+            self.log_message(f"Union Size: {jaccard_result['union_count']}", self.jaccard_output)
+            self.log_message(f"\nJaccard = {jaccard_result['intersection_count']} / {jaccard_result['union_count']}", self.jaccard_output)
+            self.log_message(f"       = {jaccard_result['jaccard_similarity']:.6f}", self.jaccard_output)
+            self.log_message(f"       = {jaccard_result['jaccard_similarity']*100:.2f}%\n", self.jaccard_output)
+            
+        elif step == 5:  # Show All Steps
+            self.log_message("ALL STEPS\n", self.jaccard_output)
+            self.log_message(f"1. Tokens & Sets:", self.jaccard_output)
+            self.log_message(f"   Set A: {len(jaccard_result['set1'])} unique terms", self.jaccard_output)
+            self.log_message(f"   Set B: {len(jaccard_result['set2'])} unique terms\n", self.jaccard_output)
+            self.log_message(f"2. Intersection: {jaccard_result['intersection_count']} common terms", self.jaccard_output)
+            self.log_message(f"   {jaccard_result['intersection']}\n", self.jaccard_output)
+            self.log_message(f"3. Union: {jaccard_result['union_count']} total unique terms", self.jaccard_output)
+            self.log_message(f"   {jaccard_result['union']}\n", self.jaccard_output)
+            self.log_message(f"4. Jaccard Similarity = {jaccard_result['jaccard_similarity']:.6f} ({jaccard_result['jaccard_similarity']*100:.2f}%)\n", self.jaccard_output)
+
+    def run_all_jaccard_steps(self):
+        """Run all Jaccard steps sequentially"""
+        for step in range(1, 6):
+            self.show_jaccard_step(step)
+            self.root.update()
+
+    def calculate_all_jaccard_documents(self):
+        """Calculate Jaccard similarity matrix for all documents"""
+        self.jaccard_output.delete(1.0, tk.END)
+        
+        if self.df_pelatihan is None or self.df_lowongan is None:
+            messagebox.showwarning("Warning", "Please load data first!")
+            return
+        
+        if 'preprocessed_text' not in self.df_pelatihan.columns:
+            messagebox.showwarning("Warning", "Please preprocess data first!")
+            return
+        
+        self.log_message("=" * 120, self.jaccard_output)
+        self.log_message("CALCULATING JACCARD SIMILARITY MATRIX", self.jaccard_output)
+        self.log_message("=" * 120, self.jaccard_output)
+        
+        def calculate():
+            try:
+                self.log_message("\nCalculating Jaccard similarities...", self.jaccard_output)
+                jaccard_matrix = self.calculate_jaccard_matrix()
+                
+                if jaccard_matrix is None:
+                    self.log_message("Error: Failed to calculate matrix", self.jaccard_output)
+                    return
+                
+                # Store matrix
+                self.jaccard_matrix = jaccard_matrix
+                
+                # Statistics
+                avg_similarity = jaccard_matrix.mean()
+                max_similarity = jaccard_matrix.max()
+                min_similarity = jaccard_matrix.min()
+                non_zero_count = np.count_nonzero(jaccard_matrix)
+                total_count = jaccard_matrix.size
+                
+                self.log_message("\n" + "=" * 120, self.jaccard_output)
+                self.log_message("✅ JACCARD MATRIX CALCULATED", self.jaccard_output)
+                self.log_message("=" * 120, self.jaccard_output)
+                self.log_message(f"\n📊 Matrix Shape: {jaccard_matrix.shape}", self.jaccard_output)
+                self.log_message(f"📊 Total Calculations: {total_count:,}", self.jaccard_output)
+                self.log_message(f"\n📈 Statistics:", self.jaccard_output)
+                self.log_message(f"   Average: {avg_similarity:.4f} ({avg_similarity*100:.2f}%)", self.jaccard_output)
+                self.log_message(f"   Maximum: {max_similarity:.4f} ({max_similarity*100:.2f}%)", self.jaccard_output)
+                self.log_message(f"   Minimum: {min_similarity:.4f} ({min_similarity*100:.2f}%)", self.jaccard_output)
+                self.log_message(f"   Non-Zero: {non_zero_count:,} ({non_zero_count/total_count*100:.1f}%)", self.jaccard_output)
+                
+                messagebox.showinfo("Complete", 
+                                f"Jaccard similarity matrix calculated!\n\n"
+                                f"Average: {avg_similarity:.2%}")
+                
+            except Exception as e:
+                self.log_message(f"\n✗ Error: {str(e)}", self.jaccard_output)
+                messagebox.showerror("Error", f"Calculation failed:\n{str(e)}")
+        
+        threading.Thread(target=calculate, daemon=True).start()
+
+    # ============================================================================
+    # COMPARISON FUNCTIONS
+    # ============================================================================
+
+    def toggle_comparison_mode(self):
+        """Toggle between all pairs and single pair mode"""
+        mode = self.comparison_mode_var.get()
+        
+        if mode == "single":
+            # Show single pair frame
+            self.single_pair_frame.pack(fill='x', pady=10, after=self.single_pair_frame.master.winfo_children()[1])
+            # Load options if not already loaded
+            self.load_comparison_document_options()
+        else:
+            # Hide single pair frame
+            self.single_pair_frame.pack_forget()
+
+    def load_comparison_document_options(self):
+        """Load document options for single pair comparison"""
+        if self.df_pelatihan is None or self.df_lowongan is None:
+            return
+        
+        # Load training options
+        if not self.comparison_training_combo['values']:
+            training_options = [f"{i}: {row['PROGRAM PELATIHAN']}" 
+                                for i, row in self.df_pelatihan.iterrows()]
+            self.comparison_training_combo['values'] = training_options
+            if training_options:
+                self.comparison_training_combo.current(0)
+        
+        # Load job options
+        if not self.comparison_job_combo['values']:
+            job_options = [f"{i}: {row['Nama Jabatan']}" 
+                        for i, row in self.df_lowongan.iterrows()]
+            self.comparison_job_combo['values'] = job_options
+            if job_options:
+                self.comparison_job_combo.current(0)
+
+    def generate_comparison(self):
+        """Generate comparison between Cosine and Jaccard similarities"""
+        self.comparison_output.delete(1.0, tk.END)
+        
+        # Check if both matrices exist
+        if not hasattr(self, 'similarity_matrix') or self.similarity_matrix is None:
+            messagebox.showwarning("Warning", "Please calculate Cosine similarity matrix first!")
+            return
+        
+        if not hasattr(self, 'jaccard_matrix') or self.jaccard_matrix is None:
+            messagebox.showwarning("Warning", "Please calculate Jaccard similarity matrix first!")
+            return
+        
+        mode = self.comparison_mode_var.get()
+        threshold = self.comparison_threshold_var.get()
+        
+        self.log_message("=" * 150, self.comparison_output)
+        self.log_message("COSINE VS JACCARD SIMILARITY COMPARISON", self.comparison_output)
+        self.log_message("=" * 150, self.comparison_output)
+        self.log_message(f"\n⚙️ Mode: {mode} | Threshold: {threshold:.2f}\n", self.comparison_output)
+        
+        comparisons = []
+        
+        if mode == "single":
+            # Single pair comparison
+            try:
+                training_idx = int(self.comparison_training_combo.get().split(':')[0])
+                job_idx = int(self.comparison_job_combo.get().split(':')[0])
+            except:
+                messagebox.showerror("Error", "Please select both training and job!")
+                return
+            
+            cosine_score = float(self.similarity_matrix[training_idx, job_idx])
+            jaccard_score = float(self.jaccard_matrix[training_idx, job_idx])
+            
+            if cosine_score > 0 and jaccard_score > 0:
+                comparisons.append({
+                    'training_idx': training_idx,
+                    'training_name': self.df_pelatihan.iloc[training_idx]['PROGRAM PELATIHAN'],
+                    'job_idx': job_idx,
+                    'job_name': self.df_lowongan.iloc[job_idx]['Nama Jabatan'],
+                    'cosine': cosine_score,
+                    'jaccard': jaccard_score,
+                    'difference': abs(cosine_score - jaccard_score)
+                })
+        else:
+            # All pairs comparison
+            for i in range(len(self.df_pelatihan)):
+                for j in range(len(self.df_lowongan)):
+                    cosine_score = float(self.similarity_matrix[i, j])
+                    jaccard_score = float(self.jaccard_matrix[i, j])
+                    
+                    # Only include if BOTH are > threshold
+                    if cosine_score >= threshold and jaccard_score >= threshold:
+                        comparisons.append({
+                            'training_idx': i,
+                            'training_name': self.df_pelatihan.iloc[i]['PROGRAM PELATIHAN'],
+                            'job_idx': j,
+                            'job_name': self.df_lowongan.iloc[j]['Nama Jabatan'],
+                            'cosine': cosine_score,
+                            'jaccard': jaccard_score,
+                            'difference': abs(cosine_score - jaccard_score)
+                        })
+        
+        if not comparisons:
+            self.log_message("No comparisons found above threshold.", self.comparison_output)
+            return
+        
+        # Display table
+        self.log_message(f"📊 Found {len(comparisons)} comparisons\n", self.comparison_output)
+        self.log_message("=" * 150, self.comparison_output)
+        
+        # Table header
+        self.log_message(
+            f"┌{'─' * 45}┬{'─' * 45}┬{'─' * 13}┬{'─' * 13}┬{'─' * 13}┬{'─' * 15}┐",
+            self.comparison_output
+        )
+        self.log_message(
+            f"│ {'Training Program':<43} │ {'Job Position':<43} │ {'Cosine':<11} │ {'Jaccard':<11} │ {'Diff':<11} │ {'Higher':<13} │",
+            self.comparison_output
+        )
+        self.log_message(
+            f"├{'─' * 45}┼{'─' * 45}┼{'─' * 13}┼{'─' * 13}┼{'─' * 13}┼{'─' * 15}┤",
+            self.comparison_output
+        )
+        
+        for comp in comparisons[:100]:  # Show first 100
+            training = comp['training_name'][:41] + ".." if len(comp['training_name']) > 43 else comp['training_name']
+            job = comp['job_name'][:41] + ".." if len(comp['job_name']) > 43 else comp['job_name']
+            
+            higher = "Cosine" if comp['cosine'] > comp['jaccard'] else "Jaccard" if comp['jaccard'] > comp['cosine'] else "Equal"
+            
+            self.log_message(
+                f"│ {training:<43} │ {job:<43} │ {comp['cosine']:>11.4f} │ {comp['jaccard']:>11.4f} │ {comp['difference']:>11.4f} │ {higher:<13} │",
+                self.comparison_output
+            )
+        
+        self.log_message(
+            f"└{'─' * 45}┴{'─' * 45}┴{'─' * 13}┴{'─' * 13}┴{'─' * 13}┴{'─' * 15}┘",
+            self.comparison_output
+        )
+        
+        # Statistics
+        cosine_values = [c['cosine'] for c in comparisons]
+        jaccard_values = [c['jaccard'] for c in comparisons]
+        correlation = np.corrcoef(cosine_values, jaccard_values)[0, 1]
+        
+        self.log_message("\n" + "=" * 150, self.comparison_output)
+        self.log_message("📈 STATISTICS", self.comparison_output)
+        self.log_message("=" * 150, self.comparison_output)
+        self.log_message(f"\nTotal Comparisons: {len(comparisons)}", self.comparison_output)
+        self.log_message(f"Average Cosine: {np.mean(cosine_values):.4f}", self.comparison_output)
+        self.log_message(f"Average Jaccard: {np.mean(jaccard_values):.4f}", self.comparison_output)
+        self.log_message(f"Average Difference: {np.mean([c['difference'] for c in comparisons]):.4f}", self.comparison_output)
+        self.log_message(f"Correlation: {correlation:.4f}\n", self.comparison_output)
+        
+        # Store for export
+        self.comparison_results = comparisons
+
+    def export_comparison(self):
+        """Export comparison to Excel"""
+        if not hasattr(self, 'comparison_results') or not self.comparison_results:
+            messagebox.showwarning("Warning", "No comparison results to export!")
+            return
+        
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[("Excel files", "*.xlsx")],
+            initialfile="cosine_vs_jaccard_comparison.xlsx"
+        )
+        
+        if filename:
+            try:
+                df = pd.DataFrame(self.comparison_results)
+                df.to_excel(filename, index=False, sheet_name='Comparison')
+                messagebox.showinfo("Success", 
+                                f"Comparison exported successfully!\n"
+                                f"File: {filename}\n"
+                                f"Records: {len(self.comparison_results)}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Export failed:\n{str(e)}")
 
 
 def main():
