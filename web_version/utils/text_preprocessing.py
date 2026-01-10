@@ -47,12 +47,12 @@ def stem_tokens(tokens):
 def fill_missing_pelatihan(df):
     """Fill missing values in training data"""
     def fill_tujuan(row):
-        if pd.isna(row['Tujuan/Kompetensi']) or str(row['Tujuan/Kompetensi']).strip() == '':
+        if pd.isna(row['Deskripsi Tujuan Program Pelatihan/Kompetensi']) or str(row['Deskripsi Tujuan Program Pelatihan/Kompetensi']).strip() == '':
             program = row['PROGRAM PELATIHAN'].strip()
             return f"Setelah mengikuti pelatihan ini peserta kompeten dalam melaksanakan pekerjaan {program.lower()} sesuai standar dan SOP di tempat kerja."
-        return row['Tujuan/Kompetensi']
+        return row['Deskripsi Tujuan Program Pelatihan/Kompetensi']
     
-    df['Tujuan/Kompetensi'] = df.apply(fill_tujuan, axis=1)
+    df['Deskripsi Tujuan Program Pelatihan/Kompetensi'] = df.apply(fill_tujuan, axis=1)
     return df
 
 def preprocess_dataframe(df, dataset_type='training'):
@@ -70,9 +70,9 @@ def preprocess_dataframe(df, dataset_type='training'):
     
     # Select text column based on dataset type
     if dataset_type == 'training':
-        df['text_features'] = df['Tujuan/Kompetensi'].fillna('')
+        df['text_features'] = df['Deskripsi Tujuan Program Pelatihan/Kompetensi'].fillna('')
     elif dataset_type == 'job':
-        df['text_features'] = df['Deskripsi KBJI'].fillna('')
+        df['text_features'] = df['Deskripsi Pekerjaan'].fillna('')
     elif dataset_type == 'realisasi':
         df['text_features'] = df['Program Pelatihan'].fillna('')
     else:

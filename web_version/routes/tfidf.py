@@ -115,7 +115,7 @@ def api_tfidf_step():
         doc2 = df_lowongan.iloc[job_idx]
         
         training_name = doc1['PROGRAM PELATIHAN']
-        job_name = doc2['Nama Jabatan']
+        job_name = doc2['Nama Jabatan (Sumber Perusahaan)']
         
         result = {
             'success': True,
@@ -250,7 +250,7 @@ def api_save_tfidf_calculation():
         # Prepare calculation data
         calculation_data = {
             'training_name': df_pelatihan.iloc[training_idx]['PROGRAM PELATIHAN'],
-            'job_name': df_lowongan.iloc[job_idx]['Nama Jabatan'],
+            'job_name': df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)'],
             'all_terms': step_data.get('all_terms', []),
             'tf_d1': step_data.get('tf_d1', {}),
             'tf_d2': step_data.get('tf_d2', {}),

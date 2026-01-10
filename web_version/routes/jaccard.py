@@ -38,7 +38,7 @@ def api_jaccard_step():
         doc2 = df_lowongan.iloc[job_idx]
         
         training_name = doc1['PROGRAM PELATIHAN']
-        job_name = doc2['Nama Jabatan']
+        job_name = doc2['Nama Jabatan (Sumber Perusahaan)']
         
         tokens1 = doc1['stemmed_tokens']
         tokens2 = doc2['stemmed_tokens']

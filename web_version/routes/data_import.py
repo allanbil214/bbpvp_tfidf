@@ -286,7 +286,7 @@ def process_training_file(file):
         df = pd.read_excel(file) #, sheet_name="Versi Ringkas Untuk Tesis")
         
         # Validate required columns
-        required_columns = ['PROGRAM PELATIHAN', 'Tujuan/Kompetensi'] #, 'Deskripsi Program']
+        required_columns = ['PROGRAM PELATIHAN', 'Deskripsi Tujuan Program Pelatihan/Kompetensi'] #, 'Deskripsi Program']
         missing_columns = [col for col in required_columns if col not in df.columns]
         
         if missing_columns:
@@ -311,7 +311,7 @@ def process_job_file(file):
         df = pd.read_excel(file) #, sheet_name="petakan ke KBJI")
         
         # Validate required columns
-        required_columns = ['Nama Jabatan', 'Deskripsi KBJI', 'Kompetensi']
+        required_columns = ['Nama Jabatan (Sumber Perusahaan)', 'Deskripsi Pekerjaan', 'Kompetensi']
         missing_columns = [col for col in required_columns if col not in df.columns]
         
         if missing_columns:

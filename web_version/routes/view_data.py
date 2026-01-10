@@ -35,7 +35,7 @@ def api_get_data():
             if df is None:
                 return jsonify({'success': False, 'message': 'Training data not loaded'})
             
-            display_columns = ['NO', 'PROGRAM PELATIHAN', 'Tujuan/Kompetensi']
+            display_columns = ['NO', 'PROGRAM PELATIHAN', 'Deskripsi Tujuan Program Pelatihan/Kompetensi']
             
         elif dataset_type == 'job':
             df = data_store.df_lowongan
@@ -43,7 +43,7 @@ def api_get_data():
                 return jsonify({'success': False, 'message': 'Job data not loaded'})
             
             # NEW: Added 'Nama Perusahaan'
-            display_columns = ['NO', 'Nama Perusahaan/Lembaga/DLL', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
+            display_columns = ['NO', 'NAMA PERUSAHAAN', 'Nama Jabatan (Sumber Perusahaan)', 'Deskripsi Pekerjaan', 'Perkiraan Lowongan']
         
         else:  # realisasi
             df = data_store.df_realisasi
@@ -157,11 +157,11 @@ def api_search_data():
         
         if dataset_type == 'training':
             df = data_store.df_pelatihan
-            search_columns = ['PROGRAM PELATIHAN', 'Tujuan/Kompetensi']
+            search_columns = ['PROGRAM PELATIHAN', 'Deskripsi Tujuan Program Pelatihan/Kompetensi']
         elif dataset_type == 'job':
             df = data_store.df_lowongan
             # NEW: Added 'Nama Perusahaan' to search
-            search_columns = ['Nama Perusahaan/Lembaga/DLL', 'Nama Jabatan', 'Deskripsi KBJI', 'Kompetensi']
+            search_columns = ['NAMA PERUSAHAAN', 'Nama Jabatan (Sumber Perusahaan)', 'Deskripsi Pekerjaan', 'Kompetensi']
         else:  # realisasi
             df = data_store.df_realisasi
             search_columns = ['Kejuruan', 'Program Pelatihan', '% Penempatan']
@@ -186,7 +186,7 @@ def api_search_data():
                     display_columns = ['No', 'Kejuruan', 'Program Pelatihan', 'Jumlah Peserta', 'Penempatan', '% Penempatan']
                 elif dataset_type == 'job':
                     # NEW: Include company name in search results
-                    display_columns = ['NO', 'Nama Perusahaan/Lembaga/DLL', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
+                    display_columns = ['NO', 'NAMA PERUSAHAAN', 'Nama Jabatan (Sumber Perusahaan)', 'Deskripsi Pekerjaan', 'Perkiraan Lowongan']
                 else:
                     display_columns = search_columns
                     

@@ -80,9 +80,9 @@ class DataStore:
         for idx in range(min(5, len(df))):
             row = df.iloc[idx]
             if dataset_type == 'training':
-                content += str(row.get('Tujuan/Kompetensi', ''))
+                content += str(row.get('Deskripsi Tujuan Program Pelatihan/Kompetensi', ''))
             elif dataset_type == 'job':
-                content += str(row.get('Deskripsi KBJI', ''))
+                content += str(row.get('Deskripsi Pekerjaan', ''))
         return hashlib.md5(content.encode()).hexdigest()
     
     def load_from_cache(self, cache_key):

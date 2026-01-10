@@ -82,8 +82,8 @@ class BBPVPMatchingGUI:
         self.total_saved_sample = 5
         
         # GitHub URLs 
-        self.github_training_url = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/dataprogrampelatihan.xlsx"
-        self.github_jobs_url = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/datalowonganpekerjaan.xlsx"
+        self.github_training_url = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/programpelatihan.xlsx"
+        self.github_jobs_url = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/lowonganpekerjaan.xlsx"
         self.github_realisasi_url = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/realisasipenempatan.xlsx"  
         
         # Indonesian stopwords
@@ -167,9 +167,9 @@ class BBPVPMatchingGUI:
         for idx in range(min(5, len(df))):  # Sample first 5 rows for hash
             row = df.iloc[idx]
             if dataset_type == 'pelatihan':
-                content += str(row.get('Tujuan/Kompetensi', ''))
+                content += str(row.get('Deskripsi Tujuan Program Pelatihan/Kompetensi', ''))
             else:
-                content += str(row.get('Deskripsi KBJI', ''))
+                content += str(row.get('Deskripsi Pekerjaan', ''))
         
         return hashlib.md5(content.encode()).hexdigest()
     
@@ -1262,7 +1262,7 @@ class BBPVPMatchingGUI:
                         total_vacancies += vacancy_count
                         
                         top_jobs.append({
-                            'job_name': job_row['Nama Jabatan'],
+                            'job_name': job_row['Nama Jabatan (Sumber Perusahaan)'],
                             'similarity': round(float(job_similarities[job_idx]) * 100, 2),
                             'vacancies': vacancy_count
                         })
@@ -1582,7 +1582,7 @@ class BBPVPMatchingGUI:
             
             # Load job options
             if self.df_lowongan is not None:
-                job_options = [f"{i}: {row['Nama Jabatan']}" 
+                job_options = [f"{i}: {row['Nama Jabatan (Sumber Perusahaan)']}" 
                             for i, row in self.df_lowongan.iterrows()]
                 self.rec_job_combo['values'] = job_options
                 if job_options:
@@ -2383,7 +2383,7 @@ class BBPVPMatchingGUI:
                 self.log_message("❌ Please load training data first!", self.view_output)
                 return
             title = "TRAINING PROGRAMS DATA - TABLE VIEW"
-            display_columns = ['NO', 'PROGRAM PELATIHAN', 'DURASI JP (@45 Menit)', 'Tujuan/Kompetensi']
+            display_columns = ['NO', 'PROGRAM PELATIHAN', 'DURASI JP (@45 Menit)', 'Deskripsi Tujuan Program Pelatihan/Kompetensi']
         
         elif dataset_type == "job":
             df = self.df_lowongan
@@ -2391,7 +2391,7 @@ class BBPVPMatchingGUI:
                 self.log_message("❌ Please load job data first!", self.view_output)
                 return
             title = "JOB POSITIONS DATA - TABLE VIEW"
-            display_columns = ['NO', 'Nama Perusahaan/Lembaga/DLL', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
+            display_columns = ['NO', 'NAMA PERUSAHAAN', 'Nama Jabatan (Sumber Perusahaan)', 'Deskripsi Pekerjaan', 'Perkiraan Lowongan']
         
         else:  # realisasi
             df = self.df_realisasi
@@ -2502,7 +2502,7 @@ class BBPVPMatchingGUI:
                 self.log_message("❌ Please load training data first!", self.view_output)
                 return
             title = "TRAINING PROGRAMS DATA - LIST VIEW"
-            display_columns = ['NO', 'PROGRAM PELATIHAN', 'DURASI JP (@45 Menit)', 'Tujuan/Kompetensi']
+            display_columns = ['NO', 'PROGRAM PELATIHAN', 'DURASI JP (@45 Menit)', 'Deskripsi Tujuan Program Pelatihan/Kompetensi']
         
         elif dataset_type == "job":
             df = self.df_lowongan
@@ -2510,7 +2510,7 @@ class BBPVPMatchingGUI:
                 self.log_message("❌ Please load job data first!", self.view_output)
                 return
             title = "JOB POSITIONS DATA - LIST VIEW"
-            display_columns = ['NO', 'Nama Perusahaan/Lembaga/DLL', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
+            display_columns = ['NO', 'NAMA PERUSAHAAN', 'Nama Jabatan (Sumber Perusahaan)', 'Deskripsi Pekerjaan', 'Perkiraan Lowongan']
         
         else:  # realisasi
             df = self.df_realisasi
@@ -2620,10 +2620,10 @@ class BBPVPMatchingGUI:
     def fill_missing_pelatihan(self):
         """Fill missing values in training data"""
         def fill_tujuan(row):
-            if pd.isna(row['Tujuan/Kompetensi']) or str(row['Tujuan/Kompetensi']).strip() == '':
+            if pd.isna(row['Deskripsi Tujuan Program Pelatihan/Kompetensi']) or str(row['Deskripsi Tujuan Program Pelatihan/Kompetensi']).strip() == '':
                 program = row['PROGRAM PELATIHAN'].strip()
                 return f"Setelah mengikuti pelatihan ini peserta kompeten dalam melaksanakan pekerjaan {program.lower()} sesuai standar dan SOP di tempat kerja."
-            return row['Tujuan/Kompetensi']
+            return row['Deskripsi Tujuan Program Pelatihan/Kompetensi']
         
         # def fill_deskripsi(row):
         #     if pd.isna(row['Deskripsi Program']) or str(row['Deskripsi Program']).strip() == '':
@@ -2631,7 +2631,7 @@ class BBPVPMatchingGUI:
         #         return f"Pelatihan ini adalah pelatihan untuk melaksanakan pekerjaan {program.lower()} sesuai standar dan SOP di tempat kerja."
         #     return row['Deskripsi Program']
         
-        self.df_pelatihan['Tujuan/Kompetensi'] = self.df_pelatihan.apply(fill_tujuan, axis=1)
+        self.df_pelatihan['Deskripsi Tujuan Program Pelatihan/Kompetensi'] = self.df_pelatihan.apply(fill_tujuan, axis=1)
         # self.df_pelatihan['Deskripsi Program'] = self.df_pelatihan.apply(fill_deskripsi, axis=1)
         self.log_message("✓ Missing values filled")
 
@@ -2720,7 +2720,7 @@ class BBPVPMatchingGUI:
             self.pelatihan_combo.current(0)
         
         # Load lowongan options
-        lowongan_options = [f"{i}: {row['Nama Jabatan']}" 
+        lowongan_options = [f"{i}: {row['Nama Jabatan (Sumber Perusahaan)']}" 
                            for i, row in self.df_lowongan.iterrows()]
         self.lowongan_combo['values'] = lowongan_options
         if lowongan_options:
@@ -2760,7 +2760,7 @@ class BBPVPMatchingGUI:
         self.log_message(f"\nTokens D1: {tokens1}", self.tfidf_output)
         self.log_message(f"Total tokens: {len(tokens1)}", self.tfidf_output)
         
-        self.log_message(f"\n📄 Document 2 (D2): {doc2['Nama Jabatan']}", self.tfidf_output)
+        self.log_message(f"\n📄 Document 2 (D2): {doc2['Nama Jabatan (Sumber Perusahaan)']}", self.tfidf_output)
         self.log_message(f"Original: {doc2['text_features'][:150]}...", self.tfidf_output)
         tokens2 = doc2['stemmed_tokens'] if 'stemmed_tokens' in doc2 else doc2['tokens']
         self.log_message(f"\nTokens D2: {tokens2}", self.tfidf_output)
@@ -2786,7 +2786,7 @@ class BBPVPMatchingGUI:
         
         pel_idx, low_idx = self.get_selected_documents()
         doc1_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
-        doc2_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan']
+        doc2_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan (Sumber Perusahaan)']
         
         self.log_message("=" * 80, self.tfidf_output)
         self.log_message("STEP 2: TERM FREQUENCY (TF)", self.tfidf_output)
@@ -2933,7 +2933,7 @@ class BBPVPMatchingGUI:
         
         pel_idx, low_idx = self.get_selected_documents()
         doc1_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
-        doc2_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan']
+        doc2_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan (Sumber Perusahaan)']
         
         self.log_message("=" * 80, self.tfidf_output)
         self.log_message("STEP 5: TF-IDF CALCULATION", self.tfidf_output)
@@ -2998,7 +2998,7 @@ class BBPVPMatchingGUI:
         
         pel_idx, low_idx = self.get_selected_documents()
         doc1_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
-        doc2_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan']
+        doc2_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan (Sumber Perusahaan)']
         
         self.log_message("=" * 80, self.tfidf_output)
         self.log_message("STEP 6: COSINE SIMILARITY", self.tfidf_output)
@@ -3111,7 +3111,7 @@ class BBPVPMatchingGUI:
             cursor = self.db_connection.cursor()
             
             training_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
-            job_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan']
+            job_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan (Sumber Perusahaan)']
             
             # Get feature names (terms)
             feature_names = vectorizer.get_feature_names_out()
@@ -3275,7 +3275,7 @@ class BBPVPMatchingGUI:
         # Process each job with progress
         total_jobs = len(self.df_lowongan)
         for low_idx in range(total_jobs):
-            lowongan_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan']
+            lowongan_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan (Sumber Perusahaan)']
             similarities = similarity_matrix[:, low_idx]
             top_3_indices = np.argsort(similarities)[-3:][::-1]
             
@@ -3364,7 +3364,7 @@ class BBPVPMatchingGUI:
             if df is None:
                 self.log_message("Please load Job Data first!", self.preprocess_output)
                 return
-            text_col = 'Nama Jabatan'
+            text_col = 'Nama Jabatan (Sumber Perusahaan)'
         
         # Get row index
         try:
@@ -3382,12 +3382,12 @@ class BBPVPMatchingGUI:
         # Create combined text
         if self.dataset_var.get() == "pelatihan":
             original = (# f"{row['PROGRAM PELATIHAN']}" 
-                        f"{row['Tujuan/Kompetensi']} "
+                        f"{row['Deskripsi Tujuan Program Pelatihan/Kompetensi']} "
                        # f"{row['Deskripsi Program']}"
                        )
         else:
-            original = (# f"{row['Nama Jabatan']} {row.get('Nama KBJI Resmi', '')} "
-                       f"{row.get('Deskripsi KBJI', '')} " 
+            original = (# f"{row['Nama Jabatan (Sumber Perusahaan)']} {row.get('Nama KBJI Resmi (Mengacu ke KBJI)', '')} "
+                       f"{row.get('Deskripsi Pekerjaan', '')} " 
                        # f"{row.get('Kompetensi', '')}"
                        )
         
@@ -3536,7 +3536,7 @@ class BBPVPMatchingGUI:
                     
                     # Combine text features
                     self.df_pelatihan['text_features'] = (
-                        self.df_pelatihan['Tujuan/Kompetensi'].fillna('')
+                        self.df_pelatihan['Deskripsi Tujuan Program Pelatihan/Kompetensi'].fillna('')
                     )
                     
                     # Apply preprocessing
@@ -3624,7 +3624,7 @@ class BBPVPMatchingGUI:
                     
                     # Combine text features
                     self.df_lowongan['text_features'] = (
-                        self.df_lowongan['Deskripsi KBJI'].fillna('')
+                        self.df_lowongan['Deskripsi Pekerjaan'].fillna('')
                     )
                     
                     # Apply preprocessing
@@ -3712,7 +3712,7 @@ class BBPVPMatchingGUI:
         success_training = False
         
         if self.df_lowongan is not None:
-            job_options = [f"{i}: {row['Nama Jabatan']}" 
+            job_options = [f"{i}: {row['Nama Jabatan (Sumber Perusahaan)']}" 
                         for i, row in self.df_lowongan.iterrows()]
             self.rec_job_combo['values'] = job_options
             if job_options:
@@ -3792,7 +3792,7 @@ class BBPVPMatchingGUI:
                 similarity = similarities[job_idx]
                 
                 # NEW: Get company name and handle NO_MATCH
-                company_name = self.df_lowongan.iloc[job_idx].get('Nama Perusahaan/Lembaga/DLL', '-')
+                company_name = self.df_lowongan.iloc[job_idx].get('NAMA PERUSAHAAN', '-')
                 is_no_match = similarity == 0
                 
                 if is_no_match:
@@ -3800,7 +3800,7 @@ class BBPVPMatchingGUI:
                     match_level = "NO_MATCH"
                     match_emoji = "❌"
                 else:
-                    job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan']
+                    job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)']
                     # Determine match level
                     if similarity >= self.match_thresholds['excellent']:
                         match_level = "excellent"
@@ -3886,7 +3886,7 @@ class BBPVPMatchingGUI:
             return
         
         training_name = self.df_pelatihan.iloc[training_idx]['PROGRAM PELATIHAN']
-        training_desc = self.df_pelatihan.iloc[training_idx].get('Tujuan/Kompetensi', 'N/A')
+        training_desc = self.df_pelatihan.iloc[training_idx].get('Deskripsi Tujuan Program Pelatihan/Kompetensi', 'N/A')
                 
         # Get similarities for this training program (row in matrix)
         similarities = self.similarity_matrix[training_idx, :]
@@ -3944,8 +3944,8 @@ class BBPVPMatchingGUI:
         
         # Table rows
         for rank, job_idx in enumerate(top_indices, 1):
-            job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan']
-            company_name = self.df_lowongan.iloc[job_idx].get('Nama Perusahaan/Lembaga/DLL', '-')  
+            job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)']
+            company_name = self.df_lowongan.iloc[job_idx].get('NAMA PERUSAHAAN', '-')  
             similarity = similarities[job_idx]
             
             # Determine match level
@@ -4053,9 +4053,9 @@ class BBPVPMatchingGUI:
             messagebox.showerror("Error", "Please select a job position!")
             return
         
-        job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan']
-        company_name = self.df_lowongan.iloc[job_idx].get('Nama Perusahaan/Lembaga/DLL', '-')  
-        job_desc = self.df_lowongan.iloc[job_idx].get('Deskripsi KBJI', 'N/A')
+        job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)']
+        company_name = self.df_lowongan.iloc[job_idx].get('NAMA PERUSAHAAN', '-')  
+        job_desc = self.df_lowongan.iloc[job_idx].get('Deskripsi Pekerjaan', 'N/A')
                 
         # Get similarities for this job
         similarities = self.similarity_matrix[:, job_idx]
@@ -4230,8 +4230,8 @@ class BBPVPMatchingGUI:
         
         # Process each job
         for job_idx in range(len(self.df_lowongan)):
-            job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan']
-            company_name = self.df_lowongan.iloc[job_idx].get('Nama Perusahaan/Lembaga/DLL', '-')
+            job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)']
+            company_name = self.df_lowongan.iloc[job_idx].get('NAMA PERUSAHAAN', '-')
             similarities = self.similarity_matrix[:, job_idx]
             
             # Get top N that meet threshold
@@ -4468,7 +4468,7 @@ class BBPVPMatchingGUI:
         try:
             cursor = self.db_connection.cursor()
             
-            record_name = row['PROGRAM PELATIHAN'] if dataset_type == 'training' else row['Nama Jabatan']
+            record_name = row['PROGRAM PELATIHAN'] if dataset_type == 'training' else row['Nama Jabatan (Sumber Perusahaan)']
             
             query = """
             INSERT INTO preprocessing_samples 
@@ -4508,7 +4508,7 @@ class BBPVPMatchingGUI:
             cursor = self.db_connection.cursor()
             
             training_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
-            job_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan']
+            job_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan (Sumber Perusahaan)']
             
             query = """
             INSERT INTO tfidf_calculations 
@@ -4557,7 +4557,7 @@ class BBPVPMatchingGUI:
             
             batch_data = []
             for job_idx in range(len(self.df_lowongan)):
-                job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan']
+                job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)']
                 for pel_idx in range(len(self.df_pelatihan)):
                     training_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
                     similarity = float(self.similarity_matrix[pel_idx, job_idx])
@@ -4902,7 +4902,7 @@ class BBPVPMatchingGUI:
             self.jaccard_pelatihan_combo.current(0)
         
         # Load lowongan options
-        lowongan_options = [f"{i}: {row['Nama Jabatan']}" 
+        lowongan_options = [f"{i}: {row['Nama Jabatan (Sumber Perusahaan)']}" 
                         for i, row in self.df_lowongan.iterrows()]
         self.jaccard_lowongan_combo['values'] = lowongan_options
         if lowongan_options:
@@ -4926,7 +4926,7 @@ class BBPVPMatchingGUI:
         doc2 = self.df_lowongan.iloc[low_idx]
         
         training_name = doc1['PROGRAM PELATIHAN']
-        job_name = doc2['Nama Jabatan']
+        job_name = doc2['Nama Jabatan (Sumber Perusahaan)']
         
         tokens1 = doc1['stemmed_tokens']
         tokens2 = doc2['stemmed_tokens']
@@ -5075,7 +5075,7 @@ class BBPVPMatchingGUI:
         
         # Load job options
         if not self.comparison_job_combo['values']:
-            job_options = [f"{i}: {row['Nama Jabatan']}" 
+            job_options = [f"{i}: {row['Nama Jabatan (Sumber Perusahaan)']}" 
                         for i, row in self.df_lowongan.iterrows()]
             self.comparison_job_combo['values'] = job_options
             if job_options:
@@ -5121,7 +5121,7 @@ class BBPVPMatchingGUI:
                     'training_idx': training_idx,
                     'training_name': self.df_pelatihan.iloc[training_idx]['PROGRAM PELATIHAN'],
                     'job_idx': job_idx,
-                    'job_name': self.df_lowongan.iloc[job_idx]['Nama Jabatan'],
+                    'job_name': self.df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)'],
                     'cosine': cosine_score,
                     'jaccard': jaccard_score,
                     'difference': abs(cosine_score - jaccard_score)
@@ -5139,7 +5139,7 @@ class BBPVPMatchingGUI:
                             'training_idx': i,
                             'training_name': self.df_pelatihan.iloc[i]['PROGRAM PELATIHAN'],
                             'job_idx': j,
-                            'job_name': self.df_lowongan.iloc[j]['Nama Jabatan'],
+                            'job_name': self.df_lowongan.iloc[j]['Nama Jabatan (Sumber Perusahaan)'],
                             'cosine': cosine_score,
                             'jaccard': jaccard_score,
                             'difference': abs(cosine_score - jaccard_score)

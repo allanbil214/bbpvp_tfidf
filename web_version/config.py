@@ -18,8 +18,8 @@ DB_CONFIG = {
 }
 
 # GitHub Data URLs
-GITHUB_TRAINING_URL = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/dataprogrampelatihan.xlsx"
-GITHUB_JOBS_URL = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/datalowonganpekerjaan.xlsx"
+GITHUB_TRAINING_URL = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/programpelatihan.xlsx"
+GITHUB_JOBS_URL = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/lowonganpekerjaan.xlsx"
 GITHUB_REALISASI_URL = "https://github.com/allanbil214/bbpvp_tfidf/raw/refs/heads/main/data/realisasipenempatan.xlsx"
 
 # Indonesian Stopwords

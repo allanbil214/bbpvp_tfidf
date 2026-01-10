@@ -174,8 +174,8 @@ def api_calculate_market_analysis():
                 total_vacancies += vacancy_count
                 
                 top_jobs.append({
-                    'job_name': job_row['Nama Jabatan'],
-                    'company_name': job_row.get('Nama Perusahaan/Lembaga/DLL', '-'),  # NEW
+                    'job_name': job_row['Nama Jabatan (Sumber Perusahaan)'],
+                    'company_name': job_row.get('NAMA PERUSAHAAN', '-'),  # NEW
                     'similarity': round(float(job_similarities[job_idx]) * 100, 2),
                     'vacancies': vacancy_count
                 })

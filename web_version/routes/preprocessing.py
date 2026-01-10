@@ -40,7 +40,7 @@ def api_preprocess_step():
             df = data_store.df_lowongan
             if df is None:
                 return jsonify({'success': False, 'message': 'Job data not loaded'})
-            text_col = 'Nama Jabatan'
+            text_col = 'Nama Jabatan (Sumber Perusahaan)'
         
         if row_idx >= len(df):
             return jsonify({'success': False, 'message': 'Row index out of range'})
@@ -49,9 +49,9 @@ def api_preprocess_step():
         
         # Create combined text
         if dataset == 'training':
-            original = f"{row['Tujuan/Kompetensi']}"
+            original = f"{row['Deskripsi Tujuan Program Pelatihan/Kompetensi']}"
         else:
-            original = f"{row.get('Deskripsi KBJI', '')}"
+            original = f"{row.get('Deskripsi Pekerjaan', '')}"
         
         result = {'success': True, 'record_name': row[text_col]}
         

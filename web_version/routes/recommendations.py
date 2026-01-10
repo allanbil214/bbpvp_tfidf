@@ -30,7 +30,7 @@ def api_get_job_positions():
         for idx, row in df_lowongan.iterrows():
             jobs.append({
                 'index': int(idx),
-                'name': row['Nama Jabatan']
+                'name': row['Nama Jabatan (Sumber Perusahaan)']
             })
         
         print(f"✓ Returning {len(jobs)} job positions")
@@ -109,8 +109,8 @@ def api_get_recommendations():
                         'Training_Program': training_name,
                         'Rank': rank,
                         'Job_Index': int(job_idx) if sim_score > 0 else None,  # NEW: null if 0
-                        'Job_Name': df_lowongan.iloc[job_idx]['Nama Jabatan'] if sim_score > 0 else '',  # NEW: blank if 0
-                        'Company_Name': df_lowongan.iloc[job_idx].get('Nama Perusahaan/Lembaga/DLL', '-'),  # KEEP: always show company
+                        'Job_Name': df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)'] if sim_score > 0 else '',  # NEW: blank if 0
+                        'Company_Name': df_lowongan.iloc[job_idx].get('NAMA PERUSAHAAN', '-'),  # KEEP: always show company
                         'Similarity_Score': sim_score,
                         'Similarity_Percentage': sim_score * 100,
                         'Status': 'NO_MATCH' if sim_score == 0 else 'MATCH',
@@ -132,8 +132,8 @@ def api_get_recommendations():
                             'Training_Program': training_name,
                             'Rank': rank,
                             'Job_Index': int(job_idx) if sim_score > 0 else None,  # NEW: null if 0
-                            'Job_Name': df_lowongan.iloc[job_idx]['Nama Jabatan'] if sim_score > 0 else '',  # NEW: blank if 0
-                            'Company_Name': df_lowongan.iloc[job_idx].get('Nama Perusahaan/Lembaga/DLL', '-'),  # KEEP: always show company
+                            'Job_Name': df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)'] if sim_score > 0 else '',  # NEW: blank if 0
+                            'Company_Name': df_lowongan.iloc[job_idx].get('NAMA PERUSAHAAN', '-'),  # KEEP: always show company
                             'Similarity_Score': sim_score,
                             'Similarity_Percentage': sim_score * 100,
                             'Status': 'NO_MATCH' if sim_score == 0 else 'MATCH',
@@ -143,7 +143,7 @@ def api_get_recommendations():
         else:  # by_job
             if item_idx is not None:
                 job_idx = int(item_idx)
-                job_name = df_lowongan.iloc[job_idx]['Nama Jabatan']
+                job_name = df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)']
                 company_name = df_lowongan.iloc[job_idx].get('Nama Perusahaan', '-')  # NEW
                 similarities = similarity_matrix[:, job_idx]
                 
@@ -167,8 +167,8 @@ def api_get_recommendations():
                     })
             else:
                 for job_idx in range(len(df_lowongan)):
-                    job_name = df_lowongan.iloc[job_idx]['Nama Jabatan']
-                    company_name = df_lowongan.iloc[job_idx].get('Nama Perusahaan/Lembaga/DLL', '-')  # NEW
+                    job_name = df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)']
+                    company_name = df_lowongan.iloc[job_idx].get('NAMA PERUSAHAAN', '-')  # NEW
                     similarities = similarity_matrix[:, job_idx]
                     
                     top_indices = np.argsort(similarities)[::-1]

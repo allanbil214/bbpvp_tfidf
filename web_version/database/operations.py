@@ -48,7 +48,7 @@ def save_preprocessing_sample(experiment_id, dataset_type, record_index, row):
     try:
         cursor = conn.cursor()
         
-        record_name = row['PROGRAM PELATIHAN'] if dataset_type == 'training' else row['Nama Jabatan']
+        record_name = row['PROGRAM PELATIHAN'] if dataset_type == 'training' else row['Nama Jabatan (Sumber Perusahaan)']
         
         query = """
         INSERT INTO preprocessing_samples 
@@ -97,7 +97,7 @@ def save_similarity_matrix(experiment_id, similarity_matrix, df_pelatihan, df_lo
         
         batch_data = []
         for job_idx in range(len(df_lowongan)):
-            job_name = df_lowongan.iloc[job_idx]['Nama Jabatan']
+            job_name = df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)']
             for pel_idx in range(len(df_pelatihan)):
                 training_name = df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
                 similarity = float(similarity_matrix[pel_idx, job_idx])
@@ -146,7 +146,7 @@ def save_tfidf_samples(experiment_id, vectorizer, tfidf_matrix, similarity_matri
             top_pel_idx = int(np.argmax(similarities))
             
             training_name = df_pelatihan.iloc[top_pel_idx]['PROGRAM PELATIHAN']
-            job_name = df_lowongan.iloc[low_idx]['Nama Jabatan']
+            job_name = df_lowongan.iloc[low_idx]['Nama Jabatan (Sumber Perusahaan)']
             
             training_vector = tfidf_matrix[top_pel_idx].toarray()[0]
             job_vector = tfidf_matrix[n_pelatihan + low_idx].toarray()[0]
