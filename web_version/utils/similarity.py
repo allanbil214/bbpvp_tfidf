@@ -68,7 +68,8 @@ def calculate_manual_tfidf(tokens1, tokens2):
     idf_dict = {}
     for term in all_terms:
         df = df_dict.get(term, 0)
-        idf = np.log((N + 1) / (df + 1)) + 1  # smoothing
+        # idf = np.log((N + 1) / (df + 1)) + 1  # smoothing
+        idf = np.log(N / df)
         idf_dict[term] = idf
     
     # Calculate TF-IDF for D1

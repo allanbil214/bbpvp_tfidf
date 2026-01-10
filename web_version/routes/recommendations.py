@@ -84,34 +84,37 @@ def api_get_recommendations():
         df_pelatihan = data_store.df_pelatihan
         df_lowongan = data_store.df_lowongan
         
-        mode = request.json.get('mode', 'by_job')  # 'by_job' or 'by_training'
+        mode = request.json.get('mode', 'by_job')
         top_n = int(request.json.get('top_n', 3))
         threshold = float(request.json.get('threshold', 0.01))
-        item_idx = request.json.get('item_idx')  # job_idx or training_idx depending on mode
+        item_idx = request.json.get('item_idx')
         
         recommendations = []
         
         if mode == 'by_training':
             # Training -> Jobs recommendations
             if item_idx is not None:
-                # Single training program
                 training_idx = int(item_idx)
                 training_name = df_pelatihan.iloc[training_idx]['PROGRAM PELATIHAN']
-                similarities = similarity_matrix[training_idx, :]  # Row for this training
+                similarities = similarity_matrix[training_idx, :]
                 
                 filtered_indices = [i for i in range(len(similarities)) if similarities[i] >= threshold]
                 filtered_indices.sort(key=lambda i: similarities[i], reverse=True)
                 top_indices = filtered_indices[:top_n]
                 
                 for rank, job_idx in enumerate(top_indices, 1):
+                    sim_score = float(similarities[job_idx])
                     recommendations.append({
                         'Training_Index': training_idx,
                         'Training_Program': training_name,
                         'Rank': rank,
-                        'Job_Index': int(job_idx),
-                        'Job_Name': df_lowongan.iloc[job_idx]['Nama Jabatan'],
-                        'Similarity_Score': float(similarities[job_idx]),
-                        'Similarity_Percentage': float(similarities[job_idx] * 100)
+                        'Job_Index': int(job_idx) if sim_score > 0 else None,  # NEW: null if 0
+                        'Job_Name': df_lowongan.iloc[job_idx]['Nama Jabatan'] if sim_score > 0 else '',  # NEW: blank if 0
+                        'Company_Name': df_lowongan.iloc[job_idx].get('Nama Perusahaan/Lembaga/DLL', '-'),  # KEEP: always show company
+                        'Similarity_Score': sim_score,
+                        'Similarity_Percentage': sim_score * 100,
+                        'Status': 'NO_MATCH' if sim_score == 0 else 'MATCH',
+                        'Recommendation': 'Rekomendasi dibuka pelatihan baru' if sim_score == 0 else ''
                     })
             else:
                 # All training programs
@@ -123,21 +126,25 @@ def api_get_recommendations():
                     filtered_indices = [idx for idx in top_indices if similarities[idx] >= threshold][:top_n]
                     
                     for rank, job_idx in enumerate(filtered_indices, 1):
+                        sim_score = float(similarities[job_idx])
                         recommendations.append({
                             'Training_Index': training_idx,
                             'Training_Program': training_name,
                             'Rank': rank,
-                            'Job_Index': int(job_idx),
-                            'Job_Name': df_lowongan.iloc[job_idx]['Nama Jabatan'],
-                            'Similarity_Score': float(similarities[job_idx]),
-                            'Similarity_Percentage': float(similarities[job_idx] * 100)
+                            'Job_Index': int(job_idx) if sim_score > 0 else None,  # NEW: null if 0
+                            'Job_Name': df_lowongan.iloc[job_idx]['Nama Jabatan'] if sim_score > 0 else '',  # NEW: blank if 0
+                            'Company_Name': df_lowongan.iloc[job_idx].get('Nama Perusahaan/Lembaga/DLL', '-'),  # KEEP: always show company
+                            'Similarity_Score': sim_score,
+                            'Similarity_Percentage': sim_score * 100,
+                            'Status': 'NO_MATCH' if sim_score == 0 else 'MATCH',
+                            'Recommendation': 'Rekomendasi dibuka pelatihan baru' if sim_score == 0 else ''
                         })
-        
-        else:  # by_job (original behavior)
+                            
+        else:  # by_job
             if item_idx is not None:
-                # Single job
                 job_idx = int(item_idx)
                 job_name = df_lowongan.iloc[job_idx]['Nama Jabatan']
+                company_name = df_lowongan.iloc[job_idx].get('Nama Perusahaan', '-')  # NEW
                 similarities = similarity_matrix[:, job_idx]
                 
                 filtered_indices = [i for i in range(len(similarities)) if similarities[i] >= threshold]
@@ -145,43 +152,50 @@ def api_get_recommendations():
                 top_indices = filtered_indices[:top_n]
                 
                 for rank, pel_idx in enumerate(top_indices, 1):
+                    sim_score = float(similarities[pel_idx])
                     recommendations.append({
                         'Job_Index': job_idx,
                         'Job_Name': job_name,
+                        'Company_Name': company_name,  # NEW
                         'Rank': rank,
-                        'Training_Index': int(pel_idx),
-                        'Training_Program': df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN'],
-                        'Similarity_Score': float(similarities[pel_idx]),
-                        'Similarity_Percentage': float(similarities[pel_idx] * 100)
+                        'Training_Index': int(pel_idx) if sim_score > 0 else None,  # NEW: null if 0
+                        'Training_Program': df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN'] if sim_score > 0 else '',  # NEW: blank if 0
+                        'Similarity_Score': sim_score,
+                        'Similarity_Percentage': sim_score * 100,
+                        'Status': 'NO_MATCH' if sim_score == 0 else 'MATCH',  # NEW
+                        'Recommendation': 'Rekomendasi dibuka pelatihan baru' if sim_score == 0 else ''  # NEW
                     })
             else:
-                # All jobs
                 for job_idx in range(len(df_lowongan)):
                     job_name = df_lowongan.iloc[job_idx]['Nama Jabatan']
+                    company_name = df_lowongan.iloc[job_idx].get('Nama Perusahaan/Lembaga/DLL', '-')  # NEW
                     similarities = similarity_matrix[:, job_idx]
                     
                     top_indices = np.argsort(similarities)[::-1]
                     filtered_indices = [idx for idx in top_indices if similarities[idx] >= threshold][:top_n]
                     
                     for rank, pel_idx in enumerate(filtered_indices, 1):
+                        sim_score = float(similarities[pel_idx])
                         recommendations.append({
                             'Job_Index': job_idx,
                             'Job_Name': job_name,
+                            'Company_Name': company_name,  # NEW
                             'Rank': rank,
-                            'Training_Index': int(pel_idx),
-                            'Training_Program': df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN'],
-                            'Similarity_Score': float(similarities[pel_idx]),
-                            'Similarity_Percentage': float(similarities[pel_idx] * 100)
+                            'Training_Index': int(pel_idx) if sim_score > 0 else None,  # NEW
+                            'Training_Program': df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN'] if sim_score > 0 else '',  # NEW
+                            'Similarity_Score': sim_score,
+                            'Similarity_Percentage': sim_score * 100,
+                            'Status': 'NO_MATCH' if sim_score == 0 else 'MATCH',  # NEW
+                            'Recommendation': 'Rekomendasi dibuka pelatihan baru' if sim_score == 0 else ''  # NEW
                         })
         
-        # Save to database - ALWAYS save, whether single or all items
+        # Save to database
         experiment_id = data_store.current_experiment_id
         if experiment_id and len(recommendations) > 0:
             try:
                 print(f"Saving {len(recommendations)} recommendations to database...")
                 save_recommendations(experiment_id, recommendations, data_store.match_thresholds)
                 
-                # Only complete experiment if it's "all items" mode
                 if item_idx is None:
                     complete_experiment(experiment_id)
                     print("✓ Experiment marked as completed")
@@ -209,7 +223,7 @@ def api_get_recommendations():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)})
-    
+
 @recommendations_bp.route('/api/export-recommendations', methods=['POST'])
 def api_export_recommendations():
     """Export recommendations to Excel or CSV"""

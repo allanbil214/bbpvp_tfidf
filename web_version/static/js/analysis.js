@@ -314,11 +314,12 @@ function showProgramDetail(index) {
     if (result.top_jobs && result.top_jobs.length > 0) {
         html += '<div class="table-responsive">';
         html += '<table class="table table-sm table-striped">';
-        html += '<thead><tr><th>Job Name</th><th class="text-center">Similarity</th><th class="text-center">Vacancies</th></tr></thead>';
+        html += '<thead><tr><th>Company</th><th>Job Name</th><th class="text-center">Similarity</th><th class="text-center">Vacancies</th></tr></thead>';  // NEW: Added Company column
         html += '<tbody>';
         
         result.top_jobs.forEach(job => {
             html += '<tr>';
+            html += `<td><small class="text-muted">${job.company_name || '-'}</small></td>`;  // NEW
             html += `<td>${job.job_name}</td>`;
             html += `<td class="text-center"><span class="badge bg-primary">${job.similarity}%</span></td>`;
             html += `<td class="text-center"><strong>${job.vacancies}</strong></td>`;

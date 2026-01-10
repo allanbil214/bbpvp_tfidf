@@ -2383,7 +2383,6 @@ class BBPVPMatchingGUI:
                 self.log_message("❌ Please load training data first!", self.view_output)
                 return
             title = "TRAINING PROGRAMS DATA - TABLE VIEW"
-            # Select only the columns you want to display
             display_columns = ['NO', 'PROGRAM PELATIHAN', 'DURASI JP (@45 Menit)', 'Tujuan/Kompetensi']
         
         elif dataset_type == "job":
@@ -2392,8 +2391,7 @@ class BBPVPMatchingGUI:
                 self.log_message("❌ Please load job data first!", self.view_output)
                 return
             title = "JOB POSITIONS DATA - TABLE VIEW"
-            # Select only the columns you want to display for jobs
-            display_columns = ['NO', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
+            display_columns = ['NO', 'Nama Perusahaan/Lembaga/DLL', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
         
         else:  # realisasi
             df = self.df_realisasi
@@ -2401,7 +2399,6 @@ class BBPVPMatchingGUI:
                 self.log_message("❌ Please load realisasi penempatan data first!", self.view_output)
                 return
             title = "REALISASI PENEMPATAN DATA - TABLE VIEW"
-            # Select only the columns you want to display for realisasi
             display_columns = ['No', 'Kejuruan', 'Program Pelatihan', 'Jumlah Peserta', 'Penempatan', '% Penempatan']
         
         # Filter to only existing columns
@@ -2505,7 +2502,6 @@ class BBPVPMatchingGUI:
                 self.log_message("❌ Please load training data first!", self.view_output)
                 return
             title = "TRAINING PROGRAMS DATA - LIST VIEW"
-            # Select only the columns you want to display
             display_columns = ['NO', 'PROGRAM PELATIHAN', 'DURASI JP (@45 Menit)', 'Tujuan/Kompetensi']
         
         elif dataset_type == "job":
@@ -2514,8 +2510,7 @@ class BBPVPMatchingGUI:
                 self.log_message("❌ Please load job data first!", self.view_output)
                 return
             title = "JOB POSITIONS DATA - LIST VIEW"
-            # Select only the columns you want to display for jobs
-            display_columns = ['NO', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
+            display_columns = ['NO', 'Nama Perusahaan/Lembaga/DLL', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
         
         else:  # realisasi
             df = self.df_realisasi
@@ -2523,7 +2518,6 @@ class BBPVPMatchingGUI:
                 self.log_message("❌ Please load realisasi penempatan data first!", self.view_output)
                 return
             title = "REALISASI PENEMPATAN DATA - LIST VIEW"
-            # Select only the columns you want to display for realisasi
             display_columns = ['No', 'Kejuruan', 'Program Pelatihan', 'Jumlah Peserta', 'Penempatan', '% Penempatan']
         
         # Filter to only existing columns
@@ -2913,7 +2907,8 @@ class BBPVPMatchingGUI:
         
         for term in self.current_all_terms:
             df = self.df_dict[term]
-            idf = np.log((N + 1) / (df + 1)) + 1 # smoothing
+            # idf = np.log((N + 1) / (df + 1)) + 1 # smoothing
+            idf = np.log(N / df)
             idf_dict[term] = idf
             
             calc_str = f"log({N}/{df})" if df > 0 else "0"
@@ -3738,7 +3733,6 @@ class BBPVPMatchingGUI:
         """Show recommendations for all training programs"""
         self.rec_output.delete(1.0, tk.END)
         
-        # Check if data is ready
         if not hasattr(self, 'similarity_matrix') or self.similarity_matrix is None:
             messagebox.showwarning("Warning", 
                                 "Please calculate similarity matrix first!\n"
@@ -3754,30 +3748,30 @@ class BBPVPMatchingGUI:
             return
         
         # Display header
-        self.log_message("=" * 150, self.rec_output)
+        self.log_message("=" * 170, self.rec_output)
         self.log_message("JOB POSITION RECOMMENDATIONS - ALL TRAINING PROGRAMS", self.rec_output)
-        self.log_message("=" * 150, self.rec_output)
+        self.log_message("=" * 170, self.rec_output)
         self.log_message(f"\n📊 Configuration: Top N = {n_recommendations} per training | Threshold = {threshold:.2f} | Training = {len(self.df_pelatihan)} | Jobs = {len(self.df_lowongan)}", self.rec_output)
         
         # Store all recommendations for export
         self.all_recommendations = []
         
-        # SQL-style table header
-        self.log_message("\n" + "=" * 150, self.rec_output)
+        # SQL-style table header with Company column
+        self.log_message("\n" + "=" * 170, self.rec_output)
         self.log_message(
-            f"┌{'─' * 8}┬{'─' * 50}┬{'─' * 50}┬{'─' * 6}┬{'─' * 13}┬{'─' * 10}┬{'─' * 12}┐",
+            f"┌{'─' * 8}┬{'─' * 50}┬{'─' * 40}┬{'─' * 35}┬{'─' * 6}┬{'─' * 13}┬{'─' * 12}┐",
             self.rec_output
         )
         self.log_message(
-            f"│ {'Train':<6} │ {'Training Program':<48} │ {'Recommended Job Position':<48} │ {'Rank':<4} │ {'Similarity':<11} │ {'Score %':<8} │ {'Match':<10} │",
+            f"│ {'Train':<6} │ {'Training Program':<48} │ {'Company':<38} │ {'Job Position':<33} │ {'Rank':<4} │ {'Similarity':<11} │ {'Match':<10} │",
             self.rec_output
         )
         self.log_message(
-            f"│ {'Idx':<6} │ {'':<48} │ {'':<48} │ {'':<4} │ {'Score':<11} │ {'':<8} │ {'Level':<10} │",
+            f"│ {'Idx':<6} │ {'':<48} │ {'':<38} │ {'':<33} │ {'':<4} │ {'Score':<11} │ {'Level':<10} │",
             self.rec_output
         )
         self.log_message(
-            f"├{'─' * 8}┼{'─' * 50}┼{'─' * 50}┼{'─' * 6}┼{'─' * 13}┼{'─' * 10}┼{'─' * 12}┤",
+            f"├{'─' * 8}┼{'─' * 50}┼{'─' * 40}┼{'─' * 35}┼{'─' * 6}┼{'─' * 13}┼{'─' * 12}┤",
             self.rec_output
         )
         
@@ -3795,32 +3789,42 @@ class BBPVPMatchingGUI:
                 continue
             
             for rank, job_idx in enumerate(filtered_indices, 1):
-                job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan']
                 similarity = similarities[job_idx]
                 
-                # Determine match level
-                if similarity >= self.match_thresholds['excellent']:
-                    match_level = "excellent"
-                    match_emoji = "🟢"
-                elif similarity >= self.match_thresholds['very_good']:
-                    match_level = "very_good"
-                    match_emoji = "🟢"
-                elif similarity >= self.match_thresholds['good']:
-                    match_level = "good"
-                    match_emoji = "🟡"
-                elif similarity >= self.match_thresholds['fair']:
-                    match_level = "fair"
-                    match_emoji = "🟡"
+                # NEW: Get company name and handle NO_MATCH
+                company_name = self.df_lowongan.iloc[job_idx].get('Nama Perusahaan/Lembaga/DLL', '-')
+                is_no_match = similarity == 0
+                
+                if is_no_match:
+                    job_name = ''  # Blank if NO_MATCH
+                    match_level = "NO_MATCH"
+                    match_emoji = "❌"
                 else:
-                    match_level = "weak"
-                    match_emoji = "🔴"
+                    job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan']
+                    # Determine match level
+                    if similarity >= self.match_thresholds['excellent']:
+                        match_level = "excellent"
+                        match_emoji = "🟢"
+                    elif similarity >= self.match_thresholds['very_good']:
+                        match_level = "very_good"
+                        match_emoji = "🟢"
+                    elif similarity >= self.match_thresholds['good']:
+                        match_level = "good"
+                        match_emoji = "🟡"
+                    elif similarity >= self.match_thresholds['fair']:
+                        match_level = "fair"
+                        match_emoji = "🟡"
+                    else:
+                        match_level = "weak"
+                        match_emoji = "🔴"
                 
                 # Truncate names if too long
                 training_display = training_name[:46] + ".." if len(training_name) > 48 else training_name
-                job_display = job_name[:46] + ".." if len(job_name) > 48 else job_name
+                company_display = company_name[:36] + ".." if len(company_name) > 38 else company_name
+                job_display = job_name[:31] + ".." if len(job_name) > 33 else job_name
                 
                 self.log_message(
-                    f"│ {training_idx:<6} │ {training_display:<48} │ {job_display:<48} │ {rank:<4} │ {similarity:<11.8f} │ {similarity*100:<8.2f} │ {match_emoji} {match_level:<8} │",
+                    f"│ {training_idx:<6} │ {training_display:<48} │ {company_display:<38} │ {job_display:<33} │ {rank:<4} │ {similarity:<11.8f} │ {match_emoji} {match_level:<8} │",
                     self.rec_output
                 )
                 
@@ -3829,28 +3833,31 @@ class BBPVPMatchingGUI:
                     'Training_Index': training_idx,
                     'Training_Program': training_name,
                     'Rank': rank,
-                    'Job_Index': job_idx,
+                    'Job_Index': int(job_idx) if not is_no_match else None,
                     'Job_Name': job_name,
+                    'Company_Name': company_name,
                     'Similarity_Score': similarity,
-                    'Similarity_Percentage': similarity * 100
+                    'Similarity_Percentage': similarity * 100,
+                    'Status': 'NO_MATCH' if is_no_match else 'MATCH',
+                    'Recommendation': 'Rekomendasi dibuka pelatihan baru' if is_no_match else ''
                 })
         
         # Table footer
         self.log_message(
-            f"└{'─' * 8}┴{'─' * 50}┴{'─' * 50}┴{'─' * 6}┴{'─' * 13}┴{'─' * 10}┴{'─' * 12}┘",
+            f"└{'─' * 8}┴{'─' * 50}┴{'─' * 40}┴{'─' * 35}┴{'─' * 6}┴{'─' * 13}┴{'─' * 12}┘",
             self.rec_output
         )
                 
         self.save_recommendations()
         self.complete_experiment()
 
-        self.log_message("\n" + "=" * 150, self.rec_output)
+        self.log_message("\n" + "=" * 170, self.rec_output)
         self.log_message("✅ ALL RECOMMENDATIONS COMPLETE", self.rec_output)
-        self.log_message("=" * 150, self.rec_output)
+        self.log_message("=" * 170, self.rec_output)
         self.log_message(f"\nTotal: {len(self.all_recommendations)} recommendations | Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
                     self.rec_output)
         self.log_message(f"💡 Export available via buttons above", self.rec_output)
-        
+
     def show_single_training_recommendations(self):
         """Show job recommendations for a single selected training program"""
         self.rec_output.delete(1.0, tk.END)
@@ -3914,7 +3921,7 @@ class BBPVPMatchingGUI:
         self.log_message(f"\n\n📊 RECOMMENDATION RESULTS (Showing {len(top_indices)} of {len(filtered_indices)} matches):", self.rec_output)
         self.log_message("=" * 150, self.rec_output)
         
-        # Table header
+        # Table header (without Note column)
         self.log_message(
             f"┌{'─' * 8}┬{'─' * 50}┬{'─' * 50}┬{'─' * 6}┬{'─' * 13}┬{'─' * 10}┬{'─' * 12}┐",
             self.rec_output
@@ -3932,36 +3939,64 @@ class BBPVPMatchingGUI:
             self.rec_output
         )
         
+        # Store for export
+        self.all_recommendations = []
+        
         # Table rows
         for rank, job_idx in enumerate(top_indices, 1):
             job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan']
+            company_name = self.df_lowongan.iloc[job_idx].get('Nama Perusahaan/Lembaga/DLL', '-')  
             similarity = similarities[job_idx]
             
             # Determine match level
-            if similarity >= self.match_thresholds['excellent']:
-                match_level = "excellent"
-                match_emoji = "🟢"
-            elif similarity >= self.match_thresholds['very_good']:
-                match_level = "very_good"
-                match_emoji = "🟢"
-            elif similarity >= self.match_thresholds['good']:
-                match_level = "good"
-                match_emoji = "🟡"
-            elif similarity >= self.match_thresholds['fair']:
-                match_level = "fair"
-                match_emoji = "🟡"
+            is_no_match = similarity == 0
+            
+            if is_no_match:
+                job_name_display = ''  # Blank if NO_MATCH
+                match_level = "NO_MATCH"
+                match_emoji = "❌"
             else:
-                match_level = "weak"
-                match_emoji = "🔴"
+                job_name_display = job_name
+                # Determine match level using self.match_thresholds
+                if similarity >= self.match_thresholds['excellent']:
+                    match_level = "excellent"
+                    match_emoji = "🟢"
+                elif similarity >= self.match_thresholds['very_good']:
+                    match_level = "very_good"
+                    match_emoji = "🟢"
+                elif similarity >= self.match_thresholds['good']:
+                    match_level = "good"
+                    match_emoji = "🟡"
+                elif similarity >= self.match_thresholds['fair']:
+                    match_level = "fair"
+                    match_emoji = "🟡"
+                else:
+                    match_level = "weak"
+                    match_emoji = "🔴"
             
             # Truncate names if too long
             training_display = training_name[:46] + ".." if len(training_name) > 48 else training_name
-            job_display = job_name[:46] + ".." if len(job_name) > 48 else job_name
+            job_display = job_name_display[:46] + ".." if len(job_name_display) > 48 else job_name_display
+            company_display = company_name[:26] + ".." if len(company_name) > 28 else company_name
             
             self.log_message(
                 f"│ {training_idx:<6} │ {training_display:<48} │ {job_display:<48} │ {rank:<4} │ {similarity:<11.8f} │ {similarity*100:<8.2f} │ {match_emoji} {match_level:<8} │",
                 self.rec_output
             )
+            
+            # Store for export
+            self.all_recommendations.append({
+                'Training_Index': training_idx,
+                'Training_Program': training_name,
+                'Rank': rank,
+                'Job_Index': int(job_idx) if not is_no_match else None,
+                'Job_Name': job_name if not is_no_match else '',
+                'Company_Name': company_name,
+                'Similarity_Score': similarity,
+                'Similarity_Percentage': similarity * 100,
+                'Status': 'NO_MATCH' if is_no_match else 'MATCH',
+                'Recommendation': 'Rekomendasi dibuka pelatihan baru' if is_no_match else ''
+            })
         
         # Table footer
         self.log_message(
@@ -3969,13 +4004,16 @@ class BBPVPMatchingGUI:
             self.rec_output
         )
         
+        # Save recommendations
+        self.save_recommendations()
+        
         # Summary
         self.log_message("\n" + "=" * 150, self.rec_output)
         self.log_message("✅ RECOMMENDATION COMPLETE", self.rec_output)
         self.log_message("=" * 150, self.rec_output)
         self.log_message(f"\n💡 Results: {len(top_indices)} recommendations displayed | Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
                         self.rec_output)
-        
+
     def load_training_recommendation_options(self):
         """Load training program options for recommendations"""
         if self.df_pelatihan is None:
@@ -4016,6 +4054,7 @@ class BBPVPMatchingGUI:
             return
         
         job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan']
+        company_name = self.df_lowongan.iloc[job_idx].get('Nama Perusahaan/Lembaga/DLL', '-')  
         job_desc = self.df_lowongan.iloc[job_idx].get('Deskripsi KBJI', 'N/A')
                 
         # Get similarities for this job
@@ -4043,6 +4082,7 @@ class BBPVPMatchingGUI:
         self.log_message("=" * 150, self.rec_output)
         
         self.log_message(f"\n🎯 JOB POSITION: {job_name}", self.rec_output)
+        self.log_message(f"🏢 COMPANY: {company_name}", self.rec_output)  
         self.log_message(f"📄 Description: {job_desc[:120]}...", self.rec_output)
         
         self.log_message(f"\n⚙️  Settings: Top N = {n_recommendations} | Threshold = {threshold:.2f} | Found = {len(filtered_indices)} programs", self.rec_output)
@@ -4051,7 +4091,7 @@ class BBPVPMatchingGUI:
         self.log_message(f"\n\n📊 RECOMMENDATION RESULTS (Showing {len(top_indices)} of {len(filtered_indices)} matches):", self.rec_output)
         self.log_message("=" * 150, self.rec_output)
         
-        # Table header
+        # Table header (without Note column)
         self.log_message(
             f"┌{'─' * 6}┬{'─' * 45}┬{'─' * 55}┬{'─' * 6}┬{'─' * 13}┬{'─' * 10}┬{'─' * 12}┐",
             self.rec_output
@@ -4069,42 +4109,71 @@ class BBPVPMatchingGUI:
             self.rec_output
         )
         
+        # Store for export
+        self.all_recommendations = []
+        
         # Table rows
         for rank, pel_idx in enumerate(top_indices, 1):
             program_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
             similarity = similarities[pel_idx]
             
             # Determine match level
-            if similarity >= 0.80:
-                match_level = "excellent"
-                match_emoji = "🟢"
-            elif similarity >= 0.65:
-                match_level = "very_good"
-                match_emoji = "🟢"
-            elif similarity >= 0.50:
-                match_level = "good"
-                match_emoji = "🟡"
-            elif similarity >= 0.35:
-                match_level = "fair"
-                match_emoji = "🟡"
+            is_no_match = similarity == 0
+            
+            if is_no_match:
+                program_name_display = ''  # Blank if NO_MATCH
+                match_level = "NO_MATCH"
+                match_emoji = "❌"
             else:
-                match_level = "weak"
-                match_emoji = "🔴"
+                program_name_display = program_name
+                # Determine match level using fixed thresholds (or use self.match_thresholds if available)
+                if similarity >= 0.80:
+                    match_level = "excellent"
+                    match_emoji = "🟢"
+                elif similarity >= 0.65:
+                    match_level = "very_good"
+                    match_emoji = "🟢"
+                elif similarity >= 0.50:
+                    match_level = "good"
+                    match_emoji = "🟡"
+                elif similarity >= 0.35:
+                    match_level = "fair"
+                    match_emoji = "🟡"
+                else:
+                    match_level = "weak"
+                    match_emoji = "🔴"
             
             # Truncate names if too long
             job_display = job_name[:41] + ".." if len(job_name) > 43 else job_name
-            program_display = program_name[:51] + ".." if len(program_name) > 53 else program_name
+            program_display = program_name_display[:51] + ".." if len(program_name_display) > 53 else program_name_display
             
             self.log_message(
                 f"│ {job_idx:<4} │ {job_display:<43} │ {program_display:<53} │ {rank:<4} │ {similarity:<11.8f} │ {similarity*100:<8.2f} │ {match_emoji} {match_level:<8} │",
                 self.rec_output
             )
+            
+            # Store for export
+            self.all_recommendations.append({
+                'Job_Index': job_idx,
+                'Job_Name': job_name,
+                'Company_Name': company_name,
+                'Rank': rank,
+                'Training_Index': int(pel_idx) if not is_no_match else None,
+                'Training_Program': program_name if not is_no_match else '',
+                'Similarity_Score': similarity,
+                'Similarity_Percentage': similarity * 100,
+                'Status': 'NO_MATCH' if is_no_match else 'MATCH',
+                'Recommendation': 'Rekomendasi dibuka pelatihan baru' if is_no_match else ''
+            })
         
         # Table footer
         self.log_message(
             f"└{'─' * 6}┴{'─' * 45}┴{'─' * 55}┴{'─' * 6}┴{'─' * 13}┴{'─' * 10}┴{'─' * 12}┘",
             self.rec_output
         )
+        
+        # Save recommendations
+        self.save_recommendations()
         
         # Summary
         self.log_message("\n" + "=" * 150, self.rec_output)
@@ -4117,7 +4186,6 @@ class BBPVPMatchingGUI:
         """Show recommendations for all jobs"""
         self.rec_output.delete(1.0, tk.END)
         
-        # Check if data is ready
         if not hasattr(self, 'similarity_matrix') or self.similarity_matrix is None:
             messagebox.showwarning("Warning", 
                                 "Please calculate similarity matrix first!\n"
@@ -4133,36 +4201,37 @@ class BBPVPMatchingGUI:
             return
         
         # Display header
-        self.log_message("=" * 150, self.rec_output)
+        self.log_message("=" * 170, self.rec_output)
         self.log_message("TRAINING PROGRAM RECOMMENDATIONS - ALL JOBS", self.rec_output)
-        self.log_message("=" * 150, self.rec_output)
+        self.log_message("=" * 170, self.rec_output)
         self.log_message(f"\n📊 Configuration: Top N = {n_recommendations} per job | Threshold = {threshold:.2f} | Jobs = {len(self.df_lowongan)} | Programs = {len(self.df_pelatihan)}", self.rec_output)
         
         # Store all recommendations for export
         self.all_recommendations = []
         
-        # SQL-style table header
-        self.log_message("\n" + "=" * 150, self.rec_output)
+        # SQL-style table header with Company column
+        self.log_message("\n" + "=" * 170, self.rec_output)
         self.log_message(
-            f"┌{'─' * 6}┬{'─' * 45}┬{'─' * 55}┬{'─' * 6}┬{'─' * 13}┬{'─' * 10}┬{'─' * 12}┐",
+            f"┌{'─' * 6}┬{'─' * 40}┬{'─' * 35}┬{'─' * 50}┬{'─' * 6}┬{'─' * 13}┬{'─' * 12}┐",
             self.rec_output
         )
         self.log_message(
-            f"│ {'Job':<4} │ {'Job Name':<43} │ {'Training Program':<53} │ {'Rank':<4} │ {'Similarity':<11} │ {'Score %':<8} │ {'Match':<10} │",
+            f"│ {'Job':<4} │ {'Company':<38} │ {'Job Name':<33} │ {'Training Program':<48} │ {'Rank':<4} │ {'Similarity':<11} │ {'Match':<10} │",
             self.rec_output
         )
         self.log_message(
-            f"│ {'Idx':<4} │ {'':<43} │ {'':<53} │ {'':<4} │ {'Score':<11} │ {'':<8} │ {'Level':<10} │",
+            f"│ {'Idx':<4} │ {'':<38} │ {'':<33} │ {'':<48} │ {'':<4} │ {'Score':<11} │ {'Level':<10} │",
             self.rec_output
         )
         self.log_message(
-            f"├{'─' * 6}┼{'─' * 45}┼{'─' * 55}┼{'─' * 6}┼{'─' * 13}┼{'─' * 10}┼{'─' * 12}┤",
+            f"├{'─' * 6}┼{'─' * 40}┼{'─' * 35}┼{'─' * 50}┼{'─' * 6}┼{'─' * 13}┼{'─' * 12}┤",
             self.rec_output
         )
         
         # Process each job
         for job_idx in range(len(self.df_lowongan)):
             job_name = self.df_lowongan.iloc[job_idx]['Nama Jabatan']
+            company_name = self.df_lowongan.iloc[job_idx].get('Nama Perusahaan/Lembaga/DLL', '-')
             similarities = self.similarity_matrix[:, job_idx]
             
             # Get top N that meet threshold
@@ -4174,33 +4243,41 @@ class BBPVPMatchingGUI:
                 continue
             
             for rank, pel_idx in enumerate(filtered_indices, 1):
-                program_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
                 similarity = similarities[pel_idx]
                 
-                # Determine match level
-                # Determine match level using self.match_thresholds
-                if similarity >= self.match_thresholds['excellent']:
-                    match_level = "excellent"
-                    match_emoji = "🟢"
-                elif similarity >= self.match_thresholds['very_good']:
-                    match_level = "very_good"
-                    match_emoji = "🟢"
-                elif similarity >= self.match_thresholds['good']:
-                    match_level = "good"
-                    match_emoji = "🟡"
-                elif similarity >= self.match_thresholds['fair']:
-                    match_level = "fair"
-                    match_emoji = "🟡"
+                # NEW: Handle NO_MATCH
+                is_no_match = similarity == 0
+                
+                if is_no_match:
+                    program_name = ''  # Blank if NO_MATCH
+                    match_level = "NO_MATCH"
+                    match_emoji = "❌"
                 else:
-                    match_level = "weak"
-                    match_emoji = "🔴"
+                    program_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
+                    # Determine match level
+                    if similarity >= self.match_thresholds['excellent']:
+                        match_level = "excellent"
+                        match_emoji = "🟢"
+                    elif similarity >= self.match_thresholds['very_good']:
+                        match_level = "very_good"
+                        match_emoji = "🟢"
+                    elif similarity >= self.match_thresholds['good']:
+                        match_level = "good"
+                        match_emoji = "🟡"
+                    elif similarity >= self.match_thresholds['fair']:
+                        match_level = "fair"
+                        match_emoji = "🟡"
+                    else:
+                        match_level = "weak"
+                        match_emoji = "🔴"
                 
                 # Truncate names if too long
-                job_display = job_name[:41] + ".." if len(job_name) > 43 else job_name
-                program_display = program_name[:51] + ".." if len(program_name) > 53 else program_name
+                company_display = company_name[:36] + ".." if len(company_name) > 38 else company_name
+                job_display = job_name[:31] + ".." if len(job_name) > 33 else job_name
+                program_display = program_name[:46] + ".." if len(program_name) > 48 else program_name
                 
                 self.log_message(
-                    f"│ {job_idx:<4} │ {job_display:<43} │ {program_display:<53} │ {rank:<4} │ {similarity:<11.8f} │ {similarity*100:<8.2f} │ {match_emoji} {match_level:<8} │",
+                    f"│ {job_idx:<4} │ {company_display:<38} │ {job_display:<33} │ {program_display:<48} │ {rank:<4} │ {similarity:<11.8f} │ {match_emoji} {match_level:<8} │",
                     self.rec_output
                 )
                 
@@ -4208,25 +4285,28 @@ class BBPVPMatchingGUI:
                 self.all_recommendations.append({
                     'Job_Index': job_idx,
                     'Job_Name': job_name,
+                    'Company_Name': company_name,
                     'Rank': rank,
-                    'Training_Index': pel_idx,
+                    'Training_Index': int(pel_idx) if not is_no_match else None,
                     'Training_Program': program_name,
                     'Similarity_Score': similarity,
-                    'Similarity_Percentage': similarity * 100
+                    'Similarity_Percentage': similarity * 100,
+                    'Status': 'NO_MATCH' if is_no_match else 'MATCH',
+                    'Recommendation': 'Rekomendasi dibuka pelatihan baru' if is_no_match else ''
                 })
         
         # Table footer
         self.log_message(
-            f"└{'─' * 6}┴{'─' * 45}┴{'─' * 55}┴{'─' * 6}┴{'─' * 13}┴{'─' * 10}┴{'─' * 12}┘",
+            f"└{'─' * 6}┴{'─' * 40}┴{'─' * 35}┴{'─' * 50}┴{'─' * 6}┴{'─' * 13}┴{'─' * 12}┘",
             self.rec_output
         )
                 
         self.save_recommendations()
         self.complete_experiment()
 
-        self.log_message("\n" + "=" * 150, self.rec_output)
+        self.log_message("\n" + "=" * 170, self.rec_output)
         self.log_message("✅ ALL RECOMMENDATIONS COMPLETE", self.rec_output)
-        self.log_message("=" * 150, self.rec_output)
+        self.log_message("=" * 170, self.rec_output)
         self.log_message(f"\nTotal: {len(self.all_recommendations)} recommendations | Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
                     self.rec_output)
         self.log_message(f"💡 Export available via buttons above", self.rec_output)

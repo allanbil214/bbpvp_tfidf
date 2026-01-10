@@ -19,6 +19,7 @@ def view_data():
                          job_count=data_store.get_job_count(),
                          realisasi_count=data_store.get_realisasi_count())
 
+# view_data.py - MODIFIED
 
 @view_data_bp.route('/api/get-data', methods=['POST'])
 def api_get_data():
@@ -34,7 +35,6 @@ def api_get_data():
             if df is None:
                 return jsonify({'success': False, 'message': 'Training data not loaded'})
             
-            # Get columns to display
             display_columns = ['NO', 'PROGRAM PELATIHAN', 'Tujuan/Kompetensi']
             
         elif dataset_type == 'job':
@@ -42,15 +42,14 @@ def api_get_data():
             if df is None:
                 return jsonify({'success': False, 'message': 'Job data not loaded'})
             
-            # Get columns to display
-            display_columns = ['NO', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
+            # NEW: Added 'Nama Perusahaan'
+            display_columns = ['NO', 'Nama Perusahaan/Lembaga/DLL', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
         
         else:  # realisasi
             df = data_store.df_realisasi
             if df is None:
                 return jsonify({'success': False, 'message': 'Realisasi data not loaded'})
             
-            # Get columns to display
             display_columns = ['No', 'Kejuruan', 'Program Pelatihan', 'Jumlah Peserta', 'Penempatan', '% Penempatan']
         
         # Calculate pagination
@@ -69,11 +68,9 @@ def api_get_data():
             for col in display_columns:
                 if col in row:
                     value = row[col]
-                    # Handle NaN values
                     if pd.isna(value):
                         record[col] = ''
                     else:
-                        # Truncate long text for display
                         if isinstance(value, str) and len(value) > 200:
                             record[col] = value[:200] + '...'
                         else:
@@ -163,7 +160,8 @@ def api_search_data():
             search_columns = ['PROGRAM PELATIHAN', 'Tujuan/Kompetensi']
         elif dataset_type == 'job':
             df = data_store.df_lowongan
-            search_columns = ['Nama Jabatan', 'Deskripsi KBJI', 'Kompetensi']
+            # NEW: Added 'Nama Perusahaan' to search
+            search_columns = ['Nama Perusahaan/Lembaga/DLL', 'Nama Jabatan', 'Deskripsi KBJI', 'Kompetensi']
         else:  # realisasi
             df = data_store.df_realisasi
             search_columns = ['Kejuruan', 'Program Pelatihan', '% Penempatan']
@@ -185,39 +183,31 @@ def api_search_data():
             if match:
                 record = {'index': int(idx)}
                 if dataset_type == 'realisasi':
-                    # For realisasi, show different columns
                     display_columns = ['No', 'Kejuruan', 'Program Pelatihan', 'Jumlah Peserta', 'Penempatan', '% Penempatan']
-                    for col in display_columns:
-                        if col in row:
-                            value = row[col]
-                            if pd.isna(value):
-                                record[col] = ''
-                            else:
-                                if isinstance(value, str) and len(value) > 100:
-                                    record[col] = value[:100] + '...'
-                                else:
-                                    record[col] = str(value)
-                        else:
-                            record[col] = ''
+                elif dataset_type == 'job':
+                    # NEW: Include company name in search results
+                    display_columns = ['NO', 'Nama Perusahaan/Lembaga/DLL', 'Nama Jabatan', 'Deskripsi KBJI', 'Perkiraan Lowongan']
                 else:
-                    for col in search_columns:
-                        if col in row:
-                            value = row[col]
-                            if pd.isna(value):
-                                record[col] = ''
-                            else:
-                                if isinstance(value, str) and len(value) > 100:
-                                    record[col] = value[:100] + '...'
-                                else:
-                                    record[col] = str(value)
-                        else:
+                    display_columns = search_columns
+                    
+                for col in display_columns:
+                    if col in row:
+                        value = row[col]
+                        if pd.isna(value):
                             record[col] = ''
+                        else:
+                            if isinstance(value, str) and len(value) > 100:
+                                record[col] = value[:100] + '...'
+                            else:
+                                record[col] = str(value)
+                    else:
+                        record[col] = ''
                 matching_records.append(record)
         
         return jsonify({
             'success': True,
             'records': matching_records,
-            'columns': search_columns if dataset_type != 'realisasi' else ['No', 'Kejuruan', 'Program Pelatihan', 'Jumlah Peserta', 'Penempatan', '% Penempatan'],
+            'columns': display_columns if dataset_type in ['realisasi', 'job'] else search_columns,
             'total_found': len(matching_records),
             'dataset_type': dataset_type
         })

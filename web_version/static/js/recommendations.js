@@ -262,40 +262,43 @@ function displayRecommendations(recommendations, mode) {
     let html = '<div class="table-responsive"><table class="table table-hover" id="recTable">';
     html += '<thead><tr>';
     
-    // Different column headers based on mode
     if (mode === 'by_job') {
-        html += '<th>Rank</th><th>Job Position</th><th>Training Program</th>';
+        html += '<th>Rank</th><th>Job Position</th><th>Company</th><th>Training Program</th>';
     } else {
-        html += '<th>Rank</th><th>Training Program</th><th>Job Position</th>';
+        html += '<th>Rank</th><th>Training Program</th><th>Job Position</th><th>Company</th>';
     }
     
-    html += '<th>Similarity</th><th>Match</th>';
+    html += '<th>Similarity</th><th>Match</th><th>Recommendation</th>';
     html += '</tr></thead><tbody>';
     
     recommendations.forEach(rec => {
         const score = rec.Similarity_Score;
         const { matchClass, matchLabel } = getMatchLevel(score, t);
+        const isNoMatch = rec.Status === 'NO_MATCH';
         
         html += '<tr>';
         html += `<td><span class="badge bg-primary">${rec.Rank}</span></td>`;
         
         if (mode === 'by_job') {
             html += `<td>${rec.Job_Name}</td>`;
-            html += `<td>${rec.Training_Program}</td>`;
+            html += `<td><small class="text-muted">${rec.Company_Name || '-'}</small></td>`;
+            html += `<td>${isNoMatch ? '<em class="text-muted">-</em>' : rec.Training_Program}</td>`;
         } else {
+            // Training → Jobs mode
             html += `<td>${rec.Training_Program}</td>`;
-            html += `<td>${rec.Job_Name}</td>`;
+            html += `<td>${isNoMatch ? '<em class="text-muted">-</em>' : rec.Job_Name}</td>`;  // NEW: blank if 0
+            html += `<td><small class="text-muted">${rec.Company_Name || '-'}</small></td>`;  // ALWAYS show company
         }
         
         html += `<td><strong>${(score * 100).toFixed(2)}%</strong></td>`;
-        html += `<td><span class="badge ${matchClass}">${matchLabel}</span></td>`;
+        html += `<td><span class="badge ${isNoMatch ? 'bg-secondary' : matchClass}">${isNoMatch ? 'NO MATCH' : matchLabel}</span></td>`;
+        html += `<td><small class="text-danger">${rec.Recommendation || '-'}</small></td>`;
         html += '</tr>';
     });
     
     html += '</tbody></table></div>';
     $('#resultsContainer').html(html);
     
-    // Initialize DataTable
     $('#recTable').DataTable({
         pageLength: 25,
         order: [[0, 'asc']],
