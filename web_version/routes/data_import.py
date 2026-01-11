@@ -311,7 +311,7 @@ def process_job_file(file):
         df = pd.read_excel(file) #, sheet_name="petakan ke KBJI")
         
         # Validate required columns
-        required_columns = ['Nama Jabatan (Sumber Perusahaan)', 'Deskripsi Pekerjaan', 'Kompetensi']
+        required_columns = ['Nama Jabatan (Sumber Perusahaan)', 'Deskripsi Pekerjaan'] #, 'Kompetensi']
         missing_columns = [col for col in required_columns if col not in df.columns]
         
         if missing_columns:

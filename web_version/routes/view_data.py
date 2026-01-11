@@ -161,7 +161,7 @@ def api_search_data():
         elif dataset_type == 'job':
             df = data_store.df_lowongan
             # NEW: Added 'Nama Perusahaan' to search
-            search_columns = ['NAMA PERUSAHAAN', 'Nama Jabatan (Sumber Perusahaan)', 'Deskripsi Pekerjaan', 'Kompetensi']
+            search_columns = ['NAMA PERUSAHAAN', 'Nama Jabatan (Sumber Perusahaan)', 'Deskripsi Pekerjaan'] #, 'Kompetensi']
         else:  # realisasi
             df = data_store.df_realisasi
             search_columns = ['Kejuruan', 'Program Pelatihan', '% Penempatan']
