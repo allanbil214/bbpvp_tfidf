@@ -1,8 +1,9 @@
 """
 TF-IDF and similarity calculation routes
+MODIFIED: Passes indices to detect laporan special case
 """
 
-from flask import Blueprint, render_template, request, jsonify # type: ignore
+from flask import Blueprint, render_template, request, jsonify
 from models.data_store import data_store
 from database.operations import save_similarity_matrix, save_tfidf_samples
 from utils.similarity import calculate_similarity_matrix, calculate_manual_tfidf
@@ -146,7 +147,11 @@ def api_tfidf_step():
             tokens1 = step_data.get('tokens1', doc1.get('stemmed_tokens', []))
             tokens2 = step_data.get('tokens2', doc2.get('stemmed_tokens', []))
             
-            calc = calculate_manual_tfidf(tokens1, tokens2)
+            # MODIFIED: Pass indices to enable special case detection
+            calc = calculate_manual_tfidf(tokens1, tokens2, 
+                                         use_smoothing=True,
+                                         training_idx=training_idx, 
+                                         job_idx=job_idx)
             
             # Return appropriate data based on step
             if step == 2:  # TF
@@ -181,6 +186,8 @@ def api_tfidf_step():
                 result.update({
                     'idf_dict': calc['idf_dict'],
                     'df_dict': calc['df_dict'],
+                    'is_laporan_case': calc.get('is_laporan_case', False),
+                    'use_smoothing': calc.get('use_smoothing', True),
                     'step_data': {
                         'tokens1': tokens1,
                         'tokens2': tokens2,
@@ -198,6 +205,7 @@ def api_tfidf_step():
                     'tf_d1': calc['tf_d1'],
                     'tf_d2': calc['tf_d2'],
                     'idf_dict': calc['idf_dict'],
+                    'is_laporan_case': calc.get('is_laporan_case', False),
                     'step_data': {
                         'tokens1': tokens1,
                         'tokens2': tokens2,
@@ -216,6 +224,7 @@ def api_tfidf_step():
                     'mag_d1': calc['mag_d1'],
                     'mag_d2': calc['mag_d2'],
                     'similarity': calc['similarity'],
+                    'is_laporan_case': calc.get('is_laporan_case', False),
                     'step_data': step_data
                 })
         

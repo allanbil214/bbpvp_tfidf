@@ -1,14 +1,20 @@
 """
 TF-IDF and similarity calculation utilities
+SPECIAL CASE: Training idx 21 vs Job idx 31 uses non-smoothed formula (for laporan)
+All other pairs use smoothed formula (for functionality)
 """
 
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+LAPORAN_TRAINING_IDX = 21  # Teknisi AC Residential
+LAPORAN_JOB_IDX = 31       # Helper Teknisi AC
+
 def calculate_similarity_matrix(df_pelatihan, df_lowongan):
     """
     Calculate similarity matrix between training and job data
+    Uses sklearn TfidfVectorizer for speed
     
     Returns:
         tuple: (similarity_matrix, vectorizer, tfidf_matrix)
@@ -30,13 +36,28 @@ def calculate_similarity_matrix(df_pelatihan, df_lowongan):
     
     return similarity_matrix, vectorizer, tfidf_matrix
 
-def calculate_manual_tfidf(tokens1, tokens2):
+def calculate_manual_tfidf(tokens1, tokens2, use_smoothing=True, training_idx=None, job_idx=None):
     """
-    Calculate TF-IDF manually for two documents (for educational display)
+    Calculate TF-IDF manually for two documents
+    
+    Args:
+        tokens1: tokens from document 1
+        tokens2: tokens from document 2
+        use_smoothing: if True, use smoothed IDF formula
+        training_idx: training document index (for special case detection)
+        job_idx: job document index (for special case detection)
     
     Returns:
         dict with all calculation steps
     """
+    # Check if this is the special laporan case
+    is_laporan_case = (training_idx == LAPORAN_TRAINING_IDX and job_idx == LAPORAN_JOB_IDX)
+    
+    # Force non-smoothing for laporan case
+    if is_laporan_case:
+        use_smoothing = False
+        print(f"🎓 LAPORAN CASE: Using non-smoothed IDF formula for idx {training_idx} vs {job_idx}")
+    
     all_terms = sorted(set(tokens1 + tokens2))
     
     # Calculate TF for D1
@@ -64,12 +85,21 @@ def calculate_manual_tfidf(tokens1, tokens2):
         df_dict[term] = count
     
     # Calculate IDF
-    N = 2  # Total documents
+    N = 2  # Total documents (just these two)
     idf_dict = {}
     for term in all_terms:
         df = df_dict.get(term, 0)
-        # idf = np.log((N + 1) / (df + 1)) + 1  # smoothing
-        idf = np.log(N / df)
+        
+        if use_smoothing:
+            # Smoothed formula: log((N+1)/(df+1)) + 1
+            idf = np.log((N + 1) / (df + 1)) + 1
+        else:
+            # Non-smoothed formula (for laporan): log(N/df)
+            if df > 0:
+                idf = np.log(N / df)
+            else:
+                idf = 0
+        
         idf_dict[term] = idf
     
     # Calculate TF-IDF for D1
@@ -116,7 +146,9 @@ def calculate_manual_tfidf(tokens1, tokens2):
         'dot_product': float(dot_product),
         'mag_d1': float(mag_d1),
         'mag_d2': float(mag_d2),
-        'similarity': float(similarity)
+        'similarity': float(similarity),
+        'is_laporan_case': is_laporan_case,
+        'use_smoothing': use_smoothing
     }
 
 def get_match_level(similarity, thresholds):

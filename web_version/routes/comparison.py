@@ -1,9 +1,11 @@
 """
 Cosine vs Jaccard Comparison routes
+MODIFIED: Uses manual 2-document TF-IDF for fair comparison with Jaccard
 """
 
 from flask import Blueprint, render_template, request, jsonify
 from models.data_store import data_store
+from utils.similarity import calculate_manual_tfidf
 import pandas as pd
 import io
 from flask import send_file
@@ -13,7 +15,8 @@ comparison_bp = Blueprint('comparison', __name__)
 @comparison_bp.route('/comparison')
 def comparison():
     """Comparison page"""
-    has_both = (data_store.has_similarity_matrix() and 
+    has_both = (data_store.has_training_data() and 
+                data_store.has_job_data() and
                 hasattr(data_store, 'jaccard_matrix') and 
                 data_store.jaccard_matrix is not None)
     
@@ -21,25 +24,34 @@ def comparison():
 
 @comparison_bp.route('/api/get-comparison', methods=['POST'])
 def api_get_comparison():
-    """Get comparison between Cosine and Jaccard similarities"""
+    """
+    Get comparison between Cosine and Jaccard similarities
+    MODIFIED: Uses manual 2-document TF-IDF for cosine calculation
+    """
     try:
-        cosine_matrix = data_store.similarity_matrix
         jaccard_matrix = getattr(data_store, 'jaccard_matrix', None)
         
-        if cosine_matrix is None or jaccard_matrix is None:
+        if jaccard_matrix is None:
             return jsonify({
                 'success': False, 
-                'message': 'Both similarity matrices must be calculated first'
-            }), 400  # ✅ Add status code
+                'message': 'Jaccard similarity matrix must be calculated first'
+            }), 400
         
         df_pelatihan = data_store.df_pelatihan
         df_lowongan = data_store.df_lowongan
         
-        # ✅ ADD: Validate DataFrames
+        # Validate DataFrames
         if df_pelatihan is None or df_lowongan is None:
             return jsonify({
                 'success': False,
                 'message': 'Data not loaded'
+            }), 400
+        
+        # Check for preprocessed data
+        if 'stemmed_tokens' not in df_pelatihan.columns or 'stemmed_tokens' not in df_lowongan.columns:
+            return jsonify({
+                'success': False,
+                'message': 'Data not preprocessed'
             }), 400
         
         mode = request.json.get('mode', 'all')
@@ -59,10 +71,18 @@ def api_get_comparison():
                     'message': 'Invalid document indices'
                 }), 400
             
-            cosine_score = float(cosine_matrix[training_idx, job_idx])
+            # Calculate manual cosine for this pair
+            tokens1 = df_pelatihan.iloc[training_idx]['stemmed_tokens']
+            tokens2 = df_lowongan.iloc[job_idx]['stemmed_tokens']
+            manual_result = calculate_manual_tfidf(tokens1, tokens2, 
+                                                   use_smoothing=True,
+                                                   training_idx=training_idx,
+                                                   job_idx=job_idx)
+            cosine_score = manual_result['similarity']
+            
             jaccard_score = float(jaccard_matrix[training_idx, job_idx])
             
-            if cosine_score > 0 and jaccard_score > 0:
+            if cosine_score > 0 or jaccard_score > 0:
                 comparisons.append({
                     'training_idx': int(training_idx),
                     'training_name': str(df_pelatihan.iloc[training_idx]['PROGRAM PELATIHAN']),
@@ -75,12 +95,30 @@ def api_get_comparison():
                     'jaccard_percentage': round(float(jaccard_score * 100), 2)
                 })
         else:
+            # Calculate manual cosine for all pairs
+            print("Calculating manual cosine similarity for all pairs...")
+            total_pairs = len(df_pelatihan) * len(df_lowongan)
+            calculated = 0
+            
             for i in range(len(df_pelatihan)):
+                tokens1 = df_pelatihan.iloc[i]['stemmed_tokens']
+                
                 for j in range(len(df_lowongan)):
-                    cosine_score = float(cosine_matrix[i, j])
+                    tokens2 = df_lowongan.iloc[j]['stemmed_tokens']
+                    
+                    # Calculate manual cosine similarity (2-doc IDF)
+                    manual_result = calculate_manual_tfidf(tokens1, tokens2)
+                    cosine_score = manual_result['similarity']
                     jaccard_score = float(jaccard_matrix[i, j])
                     
-                    if cosine_score >= min_threshold and jaccard_score >= min_threshold:
+                    calculated += 1
+                    
+                    # Progress indicator every 10%
+                    if calculated % max(1, total_pairs // 10) == 0:
+                        progress = (calculated / total_pairs) * 100
+                        print(f"Progress: {progress:.1f}% ({calculated}/{total_pairs} pairs)")
+                    
+                    if cosine_score >= min_threshold or jaccard_score >= min_threshold:
                         comparisons.append({
                             'training_idx': int(i),
                             'training_name': str(df_pelatihan.iloc[i]['PROGRAM PELATIHAN']),
@@ -92,6 +130,8 @@ def api_get_comparison():
                             'cosine_percentage': round(float(cosine_score * 100), 2),
                             'jaccard_percentage': round(float(jaccard_score * 100), 2)
                         })
+            
+            print(f"✓ Calculated {total_pairs} manual cosine similarities")
         
         # Calculate statistics
         if len(comparisons) > 0:
@@ -121,6 +161,7 @@ def api_get_comparison():
                 'avg_difference': 0.0,
                 'correlation': 0.0
             }        
+        
         print(f"✓ Generated {len(comparisons)} comparisons")
         
         return jsonify({
