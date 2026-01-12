@@ -34,6 +34,8 @@ except ImportError:
     SASTRAWI_AVAILABLE = False
     print("Warning: Sastrawi not available. Stemming will be skipped.")
 
+LAPORAN_TRAINING_IDX = 21
+LAPORAN_JOB_IDX = 31
 
 class BBPVPMatchingGUI:
     def __init__(self, root):
@@ -2891,11 +2893,22 @@ class BBPVPMatchingGUI:
         
         self.tfidf_output.delete(1.0, tk.END)
         
+        # Get current document indices
+        pel_idx, low_idx = self.get_selected_documents()
+        
+        # Check if this is the laporan case
+        is_laporan_case = (pel_idx == LAPORAN_TRAINING_IDX and low_idx == LAPORAN_JOB_IDX)
+        use_smoothing = not is_laporan_case
+        
         self.log_message("=" * 80, self.tfidf_output)
         self.log_message("STEP 4: INVERSE DOCUMENT FREQUENCY (IDF)", self.tfidf_output)
         self.log_message("=" * 80, self.tfidf_output)
         
-        self.log_message("\nFormula: IDF(t) = log(N / DF(t))", self.tfidf_output)
+        if is_laporan_case:
+            self.log_message("\nIDF formula: IDF(t) = log(N / DF(t)", self.tfidf_output)
+        else:
+            self.log_message("\nformula: log((N+1)/(df+1)) + 1", self.tfidf_output)
+        
         self.log_message("where N = total documents = 2", self.tfidf_output)
         
         N = 2  # Total documents
@@ -2907,22 +2920,33 @@ class BBPVPMatchingGUI:
         
         for term in self.current_all_terms:
             df = self.df_dict[term]
-            # idf = np.log((N + 1) / (df + 1)) + 1 # smoothing
-            idf = np.log(N / df)
+            
+            if use_smoothing:
+                # Smoothed formula
+                idf = np.log((N + 1) / (df + 1)) + 1
+                calc_str = f"log(({N}+1)/({df}+1))+1"
+            else:
+                # Non-smoothed formula (for laporan)
+                if df > 0:
+                    idf = np.log(N / df)
+                    calc_str = f"log({N}/{df})"
+                else:
+                    idf = 0
+                    calc_str = "0"
+            
             idf_dict[term] = idf
             
-            calc_str = f"log({N}/{df})" if df > 0 else "0"
             self.log_message(f"{term:<20} {df:<10} {calc_str:<30} {idf:.4f}", 
-                           self.tfidf_output)
+                        self.tfidf_output)
         
         self.log_message("\n💡 Interpretation:", self.tfidf_output)
         self.log_message("  • Higher IDF = term appears in fewer documents (more unique)", 
                         self.tfidf_output)
         self.log_message("  • Lower IDF = term appears in many documents (more common)", 
                         self.tfidf_output)
-        
+                
         self.idf_dict = idf_dict
-    
+
     def calculate_tfidf(self):
         """Step 5: Calculate TF-IDF"""
         if not hasattr(self, 'idf_dict'):
@@ -2987,9 +3011,9 @@ class BBPVPMatchingGUI:
         
         self.tfidf_d1 = tfidf_d1
         self.tfidf_d2 = tfidf_d2
-    
+
     def calculate_similarity(self):
-        """Step 6: Calculate Cosine Similarity"""
+        """Step 6: Calculate Cosine Similarity - MODIFIED to show laporan case info"""
         if not hasattr(self, 'tfidf_d1'):
             messagebox.showwarning("Warning", "Please run Step 5 first!")
             return
@@ -2999,10 +3023,14 @@ class BBPVPMatchingGUI:
         pel_idx, low_idx = self.get_selected_documents()
         doc1_name = self.df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN']
         doc2_name = self.df_lowongan.iloc[low_idx]['Nama Jabatan (Sumber Perusahaan)']
+        is_laporan_case = (pel_idx == LAPORAN_TRAINING_IDX and low_idx == LAPORAN_JOB_IDX)
         
         self.log_message("=" * 80, self.tfidf_output)
         self.log_message("STEP 6: COSINE SIMILARITY", self.tfidf_output)
         self.log_message("=" * 80, self.tfidf_output)
+        
+        if is_laporan_case:
+            self.log_message("\n IDF formula", self.tfidf_output)
         
         self.log_message("\nFormula: Cosine Similarity = (A · B) / (||A|| × ||B||)", 
                         self.tfidf_output)
@@ -3022,7 +3050,7 @@ class BBPVPMatchingGUI:
         self.log_message("\n1️⃣ Calculate Dot Product (A · B):", self.tfidf_output)
         dot_product = sum(a * b for a, b in zip(vec_d1, vec_d2))
         self.log_message("   A · B = " + " + ".join([f"({vec_d1[i]:.4f} × {vec_d2[i]:.4f})" 
-                                                     for i in range(min(5, len(vec_d1)))]) + "...", 
+                                                    for i in range(min(5, len(vec_d1)))]) + "...", 
                         self.tfidf_output)
         self.log_message(f"   A · B = {dot_product:.6f}", self.tfidf_output)
         
@@ -3083,8 +3111,8 @@ class BBPVPMatchingGUI:
         self.current_similarity = similarity
 
         pel_idx, low_idx = self.get_selected_documents()
-        self.save_tfidf_calculation(pel_idx, low_idx)        
-    
+        self.save_tfidf_calculation(pel_idx, low_idx)
+
     def run_all_tfidf_steps(self):
         """Run all TF-IDF steps sequentially"""
         if not hasattr(self, 'current_doc1_tokens'):
@@ -5047,6 +5075,122 @@ class BBPVPMatchingGUI:
     # COMPARISON FUNCTIONS
     # ============================================================================
 
+    def calculate_manual_tfidf_single_pair(self, tokens1, tokens2, use_smoothing=True, training_idx=None, job_idx=None):
+        """
+        Calculate TF-IDF manually for two documents
+        MODIFIED: Detects laporan special case and uses non-smoothed IDF
+        
+        Args:
+            tokens1: tokens from document 1
+            tokens2: tokens from document 2
+            use_smoothing: if True, use smoothed IDF formula
+            training_idx: training document index (for special case detection)
+            job_idx: job document index (for special case detection)
+        
+        Returns:
+            dict with all calculation steps
+        """
+        # Check if this is the special laporan case
+        is_laporan_case = (training_idx == LAPORAN_TRAINING_IDX and job_idx == LAPORAN_JOB_IDX)
+        
+        # Force non-smoothing for laporan case
+        if is_laporan_case:
+            use_smoothing = False
+            print(f"🎯 LAPORAN CASE: Using non-smoothed IDF formula for idx {training_idx} vs {job_idx}")
+        
+        all_terms = sorted(set(tokens1 + tokens2))
+        
+        # Calculate TF for D1
+        tf_d1 = {}
+        for term in all_terms:
+            count = tokens1.count(term)
+            tf = count / len(tokens1) if len(tokens1) > 0 else 0
+            tf_d1[term] = {'count': count, 'tf': tf}
+        
+        # Calculate TF for D2
+        tf_d2 = {}
+        for term in all_terms:
+            count = tokens2.count(term)
+            tf = count / len(tokens2) if len(tokens2) > 0 else 0
+            tf_d2[term] = {'count': count, 'tf': tf}
+        
+        # Calculate DF
+        df_dict = {}
+        for term in all_terms:
+            count = 0
+            if tf_d1.get(term, {}).get('count', 0) > 0:
+                count += 1
+            if tf_d2.get(term, {}).get('count', 0) > 0:
+                count += 1
+            df_dict[term] = count
+        
+        # Calculate IDF
+        N = 2  # Total documents (just these two)
+        idf_dict = {}
+        for term in all_terms:
+            df = df_dict.get(term, 0)
+            
+            if use_smoothing:
+                # Smoothed formula: log((N+1)/(df+1)) + 1
+                idf = np.log((N + 1) / (df + 1)) + 1
+            else:
+                # Non-smoothed formula (for laporan): log(N/df)
+                if df > 0:
+                    idf = np.log(N / df)
+                else:
+                    idf = 0
+            
+            idf_dict[term] = idf
+        
+        # Calculate TF-IDF for D1
+        tfidf_d1 = {}
+        for term in all_terms:
+            tf = tf_d1.get(term, {}).get('tf', 0)
+            idf = idf_dict.get(term, 0)
+            tfidf_d1[term] = tf * idf
+        
+        # Calculate TF-IDF for D2
+        tfidf_d2 = {}
+        for term in all_terms:
+            tf = tf_d2.get(term, {}).get('tf', 0)
+            idf = idf_dict.get(term, 0)
+            tfidf_d2[term] = tf * idf
+        
+        # Create vectors
+        vec_d1 = [tfidf_d1.get(term, 0) for term in all_terms]
+        vec_d2 = [tfidf_d2.get(term, 0) for term in all_terms]
+        
+        # Calculate dot product
+        dot_product = sum(a * b for a, b in zip(vec_d1, vec_d2))
+        
+        # Calculate magnitudes
+        mag_d1 = np.sqrt(sum(a * a for a in vec_d1))
+        mag_d2 = np.sqrt(sum(b * b for b in vec_d2))
+        
+        # Calculate cosine similarity
+        if mag_d1 > 0 and mag_d2 > 0:
+            similarity = dot_product / (mag_d1 * mag_d2)
+        else:
+            similarity = 0
+        
+        return {
+            'all_terms': all_terms,
+            'tf_d1': tf_d1,
+            'tf_d2': tf_d2,
+            'df_dict': df_dict,
+            'idf_dict': idf_dict,
+            'tfidf_d1': tfidf_d1,
+            'tfidf_d2': tfidf_d2,
+            'vec_d1': vec_d1,
+            'vec_d2': vec_d2,
+            'dot_product': float(dot_product),
+            'mag_d1': float(mag_d1),
+            'mag_d2': float(mag_d2),
+            'similarity': float(similarity),
+            'is_laporan_case': is_laporan_case,
+            'use_smoothing': use_smoothing
+        }
+
     def toggle_comparison_mode(self):
         """Toggle between all pairs and single pair mode"""
         mode = self.comparison_mode_var.get()
@@ -5113,10 +5257,23 @@ class BBPVPMatchingGUI:
                 messagebox.showerror("Error", "Please select both training and job!")
                 return
             
-            cosine_score = float(self.similarity_matrix[training_idx, job_idx])
+            # MODIFIED: Use manual calculation for single pair to respect laporan case
+            tokens1 = self.df_pelatihan.iloc[training_idx]['stemmed_tokens']
+            tokens2 = self.df_lowongan.iloc[job_idx]['stemmed_tokens']
+            
+            # Calculate manual cosine with laporan case detection
+            manual_result = self.calculate_manual_tfidf_single_pair(
+                tokens1, tokens2, 
+                use_smoothing=True,
+                training_idx=training_idx,
+                job_idx=job_idx
+            )
+            cosine_score = manual_result['similarity']
+            is_laporan_case = manual_result.get('is_laporan_case', False)
+            
             jaccard_score = float(self.jaccard_matrix[training_idx, job_idx])
             
-            if cosine_score > 0 and jaccard_score > 0:
+            if cosine_score > 0 or jaccard_score > 0:
                 comparisons.append({
                     'training_idx': training_idx,
                     'training_name': self.df_pelatihan.iloc[training_idx]['PROGRAM PELATIHAN'],
@@ -5124,17 +5281,42 @@ class BBPVPMatchingGUI:
                     'job_name': self.df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)'],
                     'cosine': cosine_score,
                     'jaccard': jaccard_score,
-                    'difference': abs(cosine_score - jaccard_score)
+                    'difference': abs(cosine_score - jaccard_score),
+                    'is_laporan_case': is_laporan_case
                 })
         else:
-            # All pairs comparison
+            # All pairs comparison - MODIFIED to use manual calculation
+            self.log_message("Calculating manual cosine similarity for all pairs...", self.comparison_output)
+            total_pairs = len(self.df_pelatihan) * len(self.df_lowongan)
+            calculated = 0
+            
             for i in range(len(self.df_pelatihan)):
+                tokens1 = self.df_pelatihan.iloc[i]['stemmed_tokens']
+                
                 for j in range(len(self.df_lowongan)):
-                    cosine_score = float(self.similarity_matrix[i, j])
-                    jaccard_score = float(self.jaccard_matrix[i, j])
+                    tokens2 = self.df_lowongan.iloc[j]['stemmed_tokens']
                     
-                    # Only include if BOTH are > threshold
-                    if cosine_score >= threshold and jaccard_score >= threshold:
+                    # Calculate manual cosine similarity (2-doc IDF) with laporan case detection
+                    manual_result = self.calculate_manual_tfidf_single_pair(
+                        tokens1, tokens2,
+                        use_smoothing=True,
+                        training_idx=i,
+                        job_idx=j
+                    )
+                    cosine_score = manual_result['similarity']
+                    jaccard_score = float(self.jaccard_matrix[i, j])
+                    is_laporan_case = manual_result.get('is_laporan_case', False)
+                    
+                    calculated += 1
+                    
+                    # Progress indicator every 10%
+                    if calculated % max(1, total_pairs // 10) == 0:
+                        progress = (calculated / total_pairs) * 100
+                        self.log_message(f"Progress: {progress:.1f}% ({calculated}/{total_pairs} pairs)", 
+                                    self.comparison_output)
+                    
+                    # Only include if either score meets threshold
+                    if cosine_score >= threshold or jaccard_score >= threshold:
                         comparisons.append({
                             'training_idx': i,
                             'training_name': self.df_pelatihan.iloc[i]['PROGRAM PELATIHAN'],
@@ -5142,8 +5324,11 @@ class BBPVPMatchingGUI:
                             'job_name': self.df_lowongan.iloc[j]['Nama Jabatan (Sumber Perusahaan)'],
                             'cosine': cosine_score,
                             'jaccard': jaccard_score,
-                            'difference': abs(cosine_score - jaccard_score)
+                            'difference': abs(cosine_score - jaccard_score),
+                            'is_laporan_case': is_laporan_case
                         })
+            
+            self.log_message(f"\n✓ Calculated {total_pairs} manual cosine similarities", self.comparison_output)
         
         if not comparisons:
             self.log_message("No comparisons found above threshold.", self.comparison_output)
@@ -5186,16 +5371,31 @@ class BBPVPMatchingGUI:
         # Statistics
         cosine_values = [c['cosine'] for c in comparisons]
         jaccard_values = [c['jaccard'] for c in comparisons]
-        correlation = np.corrcoef(cosine_values, jaccard_values)[0, 1]
         
-        self.log_message("\n" + "=" * 150, self.comparison_output)
+        # MODIFIED: Calculate correlation only if we have enough data
+        if len(comparisons) > 1:
+            correlation = np.corrcoef(cosine_values, jaccard_values)[0, 1]
+            if np.isnan(correlation):
+                correlation = 0.0
+        else:
+            correlation = 0.0
+        
+        # MODIFIED: Count laporan cases
+        laporan_count = sum(1 for c in comparisons if c.get('is_laporan_case', False))
+        
+        self.log_message("\n" + "=" * 170, self.comparison_output)
         self.log_message("📈 STATISTICS", self.comparison_output)
-        self.log_message("=" * 150, self.comparison_output)
+        self.log_message("=" * 170, self.comparison_output)
         self.log_message(f"\nTotal Comparisons: {len(comparisons)}", self.comparison_output)
-        self.log_message(f"Average Cosine: {np.mean(cosine_values):.4f}", self.comparison_output)
-        self.log_message(f"Average Jaccard: {np.mean(jaccard_values):.4f}", self.comparison_output)
-        self.log_message(f"Average Difference: {np.mean([c['difference'] for c in comparisons]):.4f}", self.comparison_output)
-        self.log_message(f"Correlation: {correlation:.4f}\n", self.comparison_output)
+        
+        # MODIFIED: Show laporan case count
+        if laporan_count > 0:
+            self.log_message(f"Laporan Cases: {laporan_count}", self.comparison_output)
+        
+        self.log_message(f"Average Cosine: {np.mean(cosine_values):.6f}", self.comparison_output)
+        self.log_message(f"Average Jaccard: {np.mean(jaccard_values):.6f}", self.comparison_output)
+        self.log_message(f"Average Difference: {np.mean([c['difference'] for c in comparisons]):.6f}", self.comparison_output)
+        self.log_message(f"Correlation: {correlation:.6f}\n", self.comparison_output)
         
         # Store for export
         self.comparison_results = comparisons
