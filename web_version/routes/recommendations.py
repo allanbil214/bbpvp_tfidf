@@ -108,13 +108,13 @@ def api_get_recommendations():
                         'Training_Index': training_idx,
                         'Training_Program': training_name,
                         'Rank': rank,
-                        'Job_Index': int(job_idx) if sim_score > 0 else None,  # NEW: null if 0
-                        'Job_Name': df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)'] if sim_score > 0 else '',  # NEW: blank if 0
-                        'Company_Name': df_lowongan.iloc[job_idx].get('NAMA PERUSAHAAN', '-'),  # KEEP: always show company
+                        'Job_Index': int(job_idx) if sim_score > 0 else None,
+                        'Job_Name': df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)'] if sim_score > 0 else '',
+                        'Company_Name': df_lowongan.iloc[job_idx].get('NAMA PERUSAHAAN', '-'),
                         'Similarity_Score': sim_score,
                         'Similarity_Percentage': sim_score * 100,
                         'Status': 'NO_MATCH' if sim_score == 0 else 'MATCH',
-                        'Recommendation': 'Rekomendasi dibuka pelatihan baru' if sim_score == 0 else ''
+                        'Recommendation': 'Tidak ada lowongan kerja yang cocok' if sim_score == 0 else ''
                     })
             else:
                 # All training programs
@@ -131,20 +131,20 @@ def api_get_recommendations():
                             'Training_Index': training_idx,
                             'Training_Program': training_name,
                             'Rank': rank,
-                            'Job_Index': int(job_idx) if sim_score > 0 else None,  # NEW: null if 0
-                            'Job_Name': df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)'] if sim_score > 0 else '',  # NEW: blank if 0
-                            'Company_Name': df_lowongan.iloc[job_idx].get('NAMA PERUSAHAAN', '-'),  # KEEP: always show company
+                            'Job_Index': int(job_idx) if sim_score > 0 else None,
+                            'Job_Name': df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)'] if sim_score > 0 else '',
+                            'Company_Name': df_lowongan.iloc[job_idx].get('NAMA PERUSAHAAN', '-'),
                             'Similarity_Score': sim_score,
                             'Similarity_Percentage': sim_score * 100,
                             'Status': 'NO_MATCH' if sim_score == 0 else 'MATCH',
-                            'Recommendation': 'Rekomendasi dibuka pelatihan baru' if sim_score == 0 else ''
+                            'Recommendation': 'Tidak ada lowongan kerja yang cocok' if sim_score == 0 else ''
                         })
                             
         else:  # by_job
             if item_idx is not None:
                 job_idx = int(item_idx)
                 job_name = df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)']
-                company_name = df_lowongan.iloc[job_idx].get('Nama Perusahaan', '-')  # NEW
+                company_name = df_lowongan.iloc[job_idx].get('Nama Perusahaan', '-')
                 similarities = similarity_matrix[:, job_idx]
                 
                 filtered_indices = [i for i in range(len(similarities)) if similarities[i] >= threshold]
@@ -156,19 +156,19 @@ def api_get_recommendations():
                     recommendations.append({
                         'Job_Index': job_idx,
                         'Job_Name': job_name,
-                        'Company_Name': company_name,  # NEW
+                        'Company_Name': company_name,
                         'Rank': rank,
-                        'Training_Index': int(pel_idx) if sim_score > 0 else None,  # NEW: null if 0
-                        'Training_Program': df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN'] if sim_score > 0 else '',  # NEW: blank if 0
+                        'Training_Index': int(pel_idx) if sim_score > 0 else None,
+                        'Training_Program': df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN'] if sim_score > 0 else '',
                         'Similarity_Score': sim_score,
                         'Similarity_Percentage': sim_score * 100,
-                        'Status': 'NO_MATCH' if sim_score == 0 else 'MATCH',  # NEW
-                        'Recommendation': 'Rekomendasi dibuka pelatihan baru' if sim_score == 0 else ''  # NEW
+                        'Status': 'NO_MATCH' if sim_score == 0 else 'MATCH',
+                        'Recommendation': 'Rekomendasi dibuka pelatihan baru' if sim_score == 0 else ''
                     })
             else:
                 for job_idx in range(len(df_lowongan)):
                     job_name = df_lowongan.iloc[job_idx]['Nama Jabatan (Sumber Perusahaan)']
-                    company_name = df_lowongan.iloc[job_idx].get('NAMA PERUSAHAAN', '-')  # NEW
+                    company_name = df_lowongan.iloc[job_idx].get('NAMA PERUSAHAAN', '-')
                     similarities = similarity_matrix[:, job_idx]
                     
                     top_indices = np.argsort(similarities)[::-1]
@@ -179,14 +179,14 @@ def api_get_recommendations():
                         recommendations.append({
                             'Job_Index': job_idx,
                             'Job_Name': job_name,
-                            'Company_Name': company_name,  # NEW
+                            'Company_Name': company_name,
                             'Rank': rank,
-                            'Training_Index': int(pel_idx) if sim_score > 0 else None,  # NEW
-                            'Training_Program': df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN'] if sim_score > 0 else '',  # NEW
+                            'Training_Index': int(pel_idx) if sim_score > 0 else None,
+                            'Training_Program': df_pelatihan.iloc[pel_idx]['PROGRAM PELATIHAN'] if sim_score > 0 else '',
                             'Similarity_Score': sim_score,
                             'Similarity_Percentage': sim_score * 100,
-                            'Status': 'NO_MATCH' if sim_score == 0 else 'MATCH',  # NEW
-                            'Recommendation': 'Rekomendasi dibuka pelatihan baru' if sim_score == 0 else ''  # NEW
+                            'Status': 'NO_MATCH' if sim_score == 0 else 'MATCH',
+                            'Recommendation': 'Rekomendasi dibuka pelatihan baru' if sim_score == 0 else ''
                         })
         
         # Save to database
